@@ -1,6 +1,9 @@
 import os
 import json
+import bisect
 from scripts.injector import KnowledgeInjector
+from scripts.gaokao_mapper import normalize_province, normalize_stream
+from scripts.sogou_api import fetch_score_range
 
 class MajorEvaluator:
     def __init__(self, data_dir=None):
@@ -136,6 +139,122 @@ class MajorEvaluator:
             if key in major_lower or major_lower in key:
                 return rate
         return 0.50  # Default moderate stability
+
+    def get_rank_from_score(self, province, year, stream, score):
+        """
+        Get exact cumulative rank for a given score in a province, year, and stream.
+        """
+        prov_clean = normalize_province(province)
+        try:
+            year_int = int(year)
+        except (ValueError, TypeError):
+            year_int = 2024
+        stream_clean = normalize_stream(prov_clean, year_int, stream)
+        
+        records = fetch_score_range(prov_clean, str(year), stream_clean)
+        if not records or not isinstance(records, list):
+            return None
+            
+        detail = []
+        for r in records:
+            if r.get("查询数据"):
+                detail = r["查询数据"]
+                break
+        if not detail:
+            return None
+            
+        valid = []
+        for item in detail:
+            try:
+                score_str = item.get("返回的查询分数", "")
+                if "-" in score_str:
+                    s_val = int(score_str.split("-")[0])
+                else:
+                    s_val = int(score_str)
+                valid.append((item, s_val, int(item.get("排名位次", 0))))
+            except (KeyError, ValueError, TypeError):
+                continue
+                
+        if not valid:
+            return None
+            
+        valid_rev = list(reversed(valid))
+        scores = [v[1] for v in valid_rev]
+        
+        try:
+            target_score = int(score)
+        except (ValueError, TypeError):
+            return None
+            
+        idx = bisect.bisect_right(scores, target_score) - 1
+        if idx < 0:
+            idx = 0
+            
+        item = valid_rev[idx][0]
+        item_score = valid_rev[idx][1]
+        
+        if target_score < item_score:
+            return int(item.get("排名位次", 999999))
+            
+        return int(item.get("排名位次", 0))
+
+    def get_score_from_rank(self, province, year, stream, rank):
+        """
+        Get score corresponding to a given cumulative rank in a province, year, and stream.
+        """
+        prov_clean = normalize_province(province)
+        try:
+            year_int = int(year)
+        except (ValueError, TypeError):
+            year_int = 2024
+        stream_clean = normalize_stream(prov_clean, year_int, stream)
+        
+        records = fetch_score_range(prov_clean, str(year), stream_clean)
+        if not records or not isinstance(records, list):
+            return None
+            
+        detail = []
+        for r in records:
+            if r.get("查询数据"):
+                detail = r["查询数据"]
+                break
+        if not detail:
+            return None
+            
+        total_nums = []
+        valid_items = []
+        for item in detail:
+            try:
+                rank_val = int(item.get("排名位次", 0))
+                total_nums.append(rank_val)
+                valid_items.append(item)
+            except (KeyError, ValueError, TypeError):
+                total_nums.append(999999)
+                valid_items.append(item)
+                
+        if not total_nums:
+            return None
+            
+        try:
+            target_rank = int(rank)
+        except (ValueError, TypeError):
+            return None
+            
+        idx = bisect.bisect_left(total_nums, target_rank)
+        if idx >= len(valid_items):
+            idx = len(valid_items) - 1
+            
+        item = valid_items[idx]
+        score_str = item.get("返回的查询分数", "")
+        if "-" in score_str:
+            try:
+                return int(score_str.split("-")[0])
+            except ValueError:
+                return score_str
+        try:
+            return int(score_str)
+        except ValueError:
+            return score_str
 
     def get_batch_lines_status(self, student_facts, year=2024):
         """

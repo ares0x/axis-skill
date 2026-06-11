@@ -1,5 +1,7 @@
 import os
 import csv
+from scripts.gaokao_mapper import normalize_province, normalize_stream
+from scripts.sogou_api import fetch_province_control_lines
 
 class KnowledgeInjector:
     def __init__(self, data_dir=None):
@@ -93,8 +95,14 @@ class KnowledgeInjector:
         """
         results = []
         year_str = str(year)
-        prov_clean = province.strip()
-        track_clean = track_type.strip()
+        
+        # 1. Normalize province and track
+        prov_clean = normalize_province(province)
+        try:
+            year_int = int(year)
+        except (ValueError, TypeError):
+            year_int = 2024
+        track_clean = normalize_stream(prov_clean, year_int, track_type)
         
         # Determine normalized track inside CSV (e.g., 理科, 物理类)
         csv_tracks = []
@@ -107,10 +115,24 @@ class KnowledgeInjector:
         else:
             csv_tracks = [track_clean, "理科", "物理类", "不分科"]
 
+        # 2. Try querying local CSV first
         for row in self.province_control_lines:
             if row.get('province') == prov_clean and row.get('year') == year_str:
                 if row.get('track_type') in csv_tracks:
                     results.append(row)
+                    
+        # 3. If local CSV doesn't have the lines, call Sogou Gaokao API as fallback
+        if not results:
+            api_lines = fetch_province_control_lines(prov_clean, year_str, track_clean)
+            for item in api_lines:
+                # Convert API keys to match CSV schema
+                results.append({
+                    'province': item.get('分数线所属地区', prov_clean),
+                    'year': item.get('分数查询年份', year_str),
+                    'track_type': item.get('考生类别', track_clean),
+                    'batch_name': item.get('录取批次', ''),
+                    'control_score': item.get('分数', '')
+                })
         return results
 
     def get_policy_context_for_prompt(self):

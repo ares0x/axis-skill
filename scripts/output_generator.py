@@ -1,6 +1,41 @@
 import os
 import json
 from scripts.evaluator import MajorEvaluator, SanageAxisEvaluator
+from scripts.gaokao_mapper import normalize_province
+
+PROVINCE_EXAM_AUTHORITIES = {
+    "北京": ("北京教育考试院", "https://www.bjeea.cn/"),
+    "天津": ("天津市教育招生考试院", "http://www.zhaokao.net/"),
+    "上海": ("上海市教育考试院", "https://www.shmeea.edu.cn/"),
+    "重庆": ("重庆市教育考试院", "https://www.cqksy.cn/"),
+    "河北": ("河北省教育考试院", "http://www.hebeea.edu.cn/"),
+    "山西": ("山西招生考试网", "http://www.sxkszx.cn/"),
+    "辽宁": ("辽宁省招生考试之窗", "https://www.lnzsks.com/"),
+    "吉林": ("吉林省教育考试院", "http://www.jleea.com.cn/"),
+    "黑龙江": ("黑龙江省招生考试信息港", "https://www.lzk.hl.cn/"),
+    "江苏": ("江苏省教育考试院", "https://www.jseea.cn/"),
+    "浙江": ("浙江省教育考试院", "https://www.zjzs.net/"),
+    "安徽": ("安徽省教育招生考试院", "https://www.ahzsks.cn/"),
+    "福建": ("福建省教育考试院", "https://www.eeafj.cn/"),
+    "江西": ("江西省教育考试院", "http://www.jxeea.cn/"),
+    "山东": ("山东省教育招生考试院", "https://www.sdzk.cn/"),
+    "河南": ("河南省教育考试院", "http://www.haeea.cn/"),
+    "湖北": ("湖北省教育考试院", "http://www.hbea.edu.cn/"),
+    "湖南": ("湖南省教育考试院", "https://www.hneao.edu.cn/"),
+    "广东": ("广东省教育考试院", "https://eea.gd.gov.cn/"),
+    "广西": ("广西招生考试院", "https://www.gxeea.cn/"),
+    "海南": ("海南省考试局", "http://ea.hainan.gov.cn/"),
+    "四川": ("四川省教育考试院", "https://www.sceea.cn/"),
+    "贵州": ("贵州省招生考试院", "http://zsksy.guizhou.gov.cn/"),
+    "云南": ("云南省招生考试院", "https://www.ynzs.cn/"),
+    "陕西": ("陕西省教育考试院", "http://www.sneac.com/"),
+    "甘肃": ("甘肃省教育考试院", "https://www.ganseea.cn/"),
+    "青海": ("青海省教育考试网", "http://www.qhjyks.com/"),
+    "宁夏": ("宁夏教育考试院", "https://www.nxjyks.cn/"),
+    "新疆": ("新疆招生网", "http://www.xjzk.gov.cn/"),
+    "内蒙古": ("内蒙古自治区教育招生考试中心", "https://www.nm.zsks.cn/"),
+    "西藏": ("西藏自治区教育考试院", "http://zsks.edu.xizang.gov.cn/")
+}
 
 def parse_markdown_with_frontmatter(content):
     frontmatter = {}
@@ -196,8 +231,22 @@ class OutputGenerator:
                 "【避坑指南】避开所有低端外语、工商管理、公共管理等AI高替代且高饱和的专业。"
             ]
 
-        # 6. Generate Markdown Report Content
+        # 6. Lookup Province Exam Authority
+        norm_prov = normalize_province(province)
+        authority_name, authority_url = PROVINCE_EXAM_AUTHORITIES.get(
+            norm_prov, ("阳光高考", "https://gaokao.chsi.com.cn/")
+        )
+
+        # 7. Generate Disclaimer Block
+        disclaimer_block = f"""> 🚨 **【AI 辅助说明与免责声明】**
+> 本报告内容均由 AI 辅助生成，仅供参考，不构成任何填报、录取或决策的承诺与建议。最终决定请你和家人结合官方信息综合判断。
+> 录取位次、招生计划等核心数据具有时效性与大小年波动风险，具体填报事项请前往 **[{authority_name}]({authority_url})** 查看和操作。
+"""
+
+        # 8. Generate Markdown Report Content
         report = f"""# sanage Axis - 考生未来生存行动清单 (1+X 方案)
+
+{disclaimer_block}
 
 ## 👤 考生画像与绝对事实 (Hard Facts)
 - **考生UID**: {uid}
@@ -276,10 +325,29 @@ class OutputGenerator:
         for action in hedging_actions:
             report += f"- {action}\n"
             
+        # 9. Append Dynamic Data Sources Table
         report += f"""
+---
+
+## 📅 数据来源与时效声明 (Data Sources & Validity)
+
+- **高考批次省控制线**: [{authority_name}]({authority_url}) / 搜狗高考数据库 · 采集年份：2024-2025 · 采集于 2026-06-11
+- **一分一段位次表**: [{authority_name}]({authority_url}) / 搜狗高考一分一段数据库 · 采集年份：2024-2025 · 采集于 2026-06-11
+- **战略新增专业与撤销专业名单**: 中华人民共和国教育部官方公开数据 · 采集年份：2026 · 采集于 2026-03
+
 ---
 `[Current State: Export Ready] - Axis System Output generated successfully.`
 """
+        # Sanitize report content for promise words
+        prohibited_replacements = {
+            "保证录取": "录取概率较大",
+            "一定能录": "录取概率较大",
+            "100%录取": "录取概率极高",
+            "法律效力": "效力参考"
+        }
+        for bad, good in prohibited_replacements.items():
+            report = report.replace(bad, good)
+
         return report
 
     def _build_adversarial_review(self, track_type, target_majors, evals, holland_code):
@@ -290,7 +358,7 @@ class OutputGenerator:
         high_risk = [e for e in evals if e['ai_replacement_index'] >= 0.7 and not e['is_vetoed']]
 
         veto_list = "、".join([e['major'] for e in vetoed]) or "无"
-        risk_list = "、".join([e['major'] for e in high_risk]) or "无"
+        risk_list = "`、`".join([e['major'] for e in high_risk]) or "无"
         all_majors = "、".join(target_majors)
 
         # Build dynamic dialogue based on track type

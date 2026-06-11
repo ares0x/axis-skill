@@ -240,7 +240,7 @@ class AxisRunner:
         parts = args_str.split(' ', 1)
         if len(parts) < 2:
             print("❌ Invalid set command. Format: `/set [key] [value]`")
-            print("Valid keys: `province`, `track`, `score`, `art_rank`, `subjects`")
+            print("Valid keys: `province`, `track`, `score`, `art_rank`, `subjects`, `holland_code`, `core_driver`")
             return
             
         key, value = parts[0].strip().lower(), parts[1].strip()
@@ -271,8 +271,16 @@ class AxisRunner:
             old_val = info.get("subjects", "")
             info["subjects"] = value
             is_critical = True
+        elif key in ["holland_code", "holland"]:
+            profile = self.current_facts["psychological_profile"]
+            old_val = ",".join(profile.get("holland_code_inferred", []))
+            profile["holland_code_inferred"] = [x.strip().upper() for x in value.split(",") if x.strip()]
+        elif key in ["core_driver", "driver"]:
+            profile = self.current_facts["psychological_profile"]
+            old_val = profile.get("core_driver", "")
+            profile["core_driver"] = value
         else:
-            print(f"❌ Unknown key '{key}'. Valid keys: `province`, `track`, `score`, `art_rank`, `subjects`")
+            print(f"❌ Unknown key '{key}'. Valid keys: `province`, `track`, `score`, `art_rank`, `subjects`, `holland_code`, `core_driver`")
             return
             
         if old_val != value:
@@ -675,6 +683,60 @@ class AxisRunner:
 /exit              - Exit the application
 """)
 
+    def execute_command(self, cmd_line, interactive=True):
+        """Execute a single command line string."""
+        cmd_line = cmd_line.strip()
+        if not cmd_line:
+            return
+            
+        if cmd_line.startswith("/init"):
+            parts = cmd_line.split(' ', 1)
+            if len(parts) < 2:
+                print("❌ Usage: /init [uid]")
+                return
+            self.handle_init(parts[1].strip(), interactive=interactive)
+        elif cmd_line.startswith("/set"):
+            parts = cmd_line.split(' ', 1)
+            if len(parts) < 2:
+                print("❌ Usage: /set [key] [value]")
+                return
+            self.handle_set(parts[1].strip())
+        elif cmd_line.startswith("/add_major"):
+            parts = cmd_line.split(' ', 1)
+            if len(parts) < 2:
+                print("❌ Usage: /add_major [major_name]")
+                return
+            self.handle_add_major(parts[1].strip())
+        elif cmd_line == "/explore":
+            if not interactive:
+                print("❌ Cannot run talent assessment quiz non-interactively.")
+                return
+            self.handle_explore()
+        elif cmd_line == "/status":
+            self.print_status()
+        elif cmd_line == "/veto":
+            self.handle_veto()
+        elif cmd_line == "/audit":
+            self.handle_audit()
+        elif cmd_line.startswith("/save"):
+            parts = cmd_line.split(' ', 1)
+            title = parts[1].strip() if len(parts) >= 2 else "counseling milestone"
+            self.handle_save(title)
+        elif cmd_line.startswith("/restore"):
+            parts = cmd_line.split(' ', 1)
+            arg = parts[1].strip() if len(parts) >= 2 else ""
+            self.handle_restore(arg)
+        elif cmd_line == "/list":
+            self.handle_list()
+        elif cmd_line == "/report":
+            self.handle_report()
+        elif cmd_line == "/export":
+            self.handle_export()
+        elif cmd_line == "/help":
+            self.print_help()
+        else:
+            print(f"❌ Unknown command: {cmd_line}. Type `/help` for options.")
+
     def start_loop(self):
         print("⚡ Welcome to sanage Axis v3.0 - Agent-Driven Major Selector ⚡")
         self.print_help()
@@ -688,50 +750,7 @@ class AxisRunner:
                 if cmd_line == "/exit":
                     print("Goodbye!")
                     break
-                elif cmd_line.startswith("/init"):
-                    parts = cmd_line.split(' ', 1)
-                    if len(parts) < 2:
-                        print("❌ Usage: /init [uid]")
-                        continue
-                    self.handle_init(parts[1].strip())
-                elif cmd_line.startswith("/set"):
-                    parts = cmd_line.split(' ', 1)
-                    if len(parts) < 2:
-                        print("❌ Usage: /set [key] [value]")
-                        continue
-                    self.handle_set(parts[1].strip())
-                elif cmd_line.startswith("/add_major"):
-                    parts = cmd_line.split(' ', 1)
-                    if len(parts) < 2:
-                        print("❌ Usage: /add_major [major_name]")
-                        continue
-                    self.handle_add_major(parts[1].strip())
-                elif cmd_line == "/explore":
-                    self.handle_explore()
-                elif cmd_line == "/status":
-                    self.print_status()
-                elif cmd_line == "/veto":
-                    self.handle_veto()
-                elif cmd_line == "/audit":
-                    self.handle_audit()
-                elif cmd_line.startswith("/save"):
-                    parts = cmd_line.split(' ', 1)
-                    title = parts[1].strip() if len(parts) >= 2 else "counseling milestone"
-                    self.handle_save(title)
-                elif cmd_line.startswith("/restore"):
-                    parts = cmd_line.split(' ', 1)
-                    arg = parts[1].strip() if len(parts) >= 2 else ""
-                    self.handle_restore(arg)
-                elif cmd_line == "/list":
-                    self.handle_list()
-                elif cmd_line == "/report":
-                    self.handle_report()
-                elif cmd_line == "/export":
-                    self.handle_export()
-                elif cmd_line == "/help":
-                    self.print_help()
-                else:
-                    print(f"❌ Unknown command: {cmd_line}. Type `/help` for options.")
+                self.execute_command(cmd_line, interactive=True)
             except KeyboardInterrupt:
                 print("\nGoodbye!")
                 break
@@ -740,48 +759,57 @@ class AxisRunner:
 
 if __name__ == '__main__':
     runner = AxisRunner()
-    if len(sys.argv) > 1 and sys.argv[1] == '--test-mode':
-        # Simulated run for Guangdong Spring Exam
-        print("\n--- Running Simulation 1: Guangdong Spring Exam ---")
-        runner.handle_init('test_spring_student', interactive=False)
-        runner.handle_set('province 广东')
-        runner.handle_set('track 广东春考')
-        runner.handle_set('score 380')
-        runner.handle_set('subjects 物理,化学,生物')
-        # Simulate Q1='A' (Hardware), Q2='A' (Stability/Barriers)
-        results = runner.trait_evaluator.evaluate_traits('A', 'A')
-        profile = runner.current_facts["psychological_profile"]
-        profile["holland_code_inferred"] = results["holland_code_inferred"]
-        profile["core_driver"] = results["core_driver"]
-        profile["derived_strengths"] = results["derived_strengths"]
-        runner.save_facts(runner.current_uid, runner.current_facts)
-        
-        runner.handle_add_major('智能控制技术')
-        runner.handle_add_major('大数据与会计')
-        runner.handle_veto()
-        runner.handle_audit()
-        runner.handle_export()
+    if len(sys.argv) > 1:
+        if sys.argv[1] == '--test-mode':
+            # Simulated run for Guangdong Spring Exam
+            print("\n--- Running Simulation 1: Guangdong Spring Exam ---")
+            runner.handle_init('test_spring_student', interactive=False)
+            runner.handle_set('province 广东')
+            runner.handle_set('track 广东春考')
+            runner.handle_set('score 380')
+            runner.handle_set('subjects 物理,化学,生物')
+            # Simulate Q1='A' (Hardware), Q2='A' (Stability/Barriers)
+            results = runner.trait_evaluator.evaluate_traits('A', 'A')
+            profile = runner.current_facts["psychological_profile"]
+            profile["holland_code_inferred"] = results["holland_code_inferred"]
+            profile["core_driver"] = results["core_driver"]
+            profile["derived_strengths"] = results["derived_strengths"]
+            runner.save_facts(runner.current_uid, runner.current_facts)
+            
+            runner.handle_add_major('智能控制技术')
+            runner.handle_add_major('大数据与会计')
+            runner.handle_veto()
+            runner.handle_audit()
+            runner.handle_export()
 
-        # Simulated run for Art Exam
-        print("\n--- Running Simulation 2: Art/Design Exam ---")
-        runner.handle_init('test_art_student', interactive=False)
-        runner.handle_set('province 广东')
-        runner.handle_set('track 艺术类')
-        runner.handle_set('score 450')
-        runner.handle_set('art_rank 800')
-        runner.handle_set('subjects 历史,地理,生物')
-        # Simulate Q1='C' (Interpersonal/Creative), Q2='B' (High risk/return)
-        results2 = runner.trait_evaluator.evaluate_traits('C', 'B', '我喜欢画画、动漫与界面设计')
-        profile2 = runner.current_facts["psychological_profile"]
-        profile2["holland_code_inferred"] = results2["holland_code_inferred"]
-        profile2["core_driver"] = results2["core_driver"]
-        profile2["derived_strengths"] = results2["derived_strengths"]
-        runner.save_facts(runner.current_uid, runner.current_facts)
-        
-        runner.handle_add_major('数字媒体艺术')
-        runner.handle_add_major('视觉传达设计')
-        runner.handle_veto()
-        runner.handle_audit()
-        runner.handle_export()
+            # Simulated run for Art Exam
+            print("\n--- Running Simulation 2: Art/Design Exam ---")
+            runner.handle_init('test_art_student', interactive=False)
+            runner.handle_set('province 广东')
+            runner.handle_set('track 艺术类')
+            runner.handle_set('score 450')
+            runner.handle_set('art_rank 800')
+            runner.handle_set('subjects 历史,地理,生物')
+            # Simulate Q1='C' (Interpersonal/Creative), Q2='B' (High risk/return)
+            results2 = runner.trait_evaluator.evaluate_traits('C', 'B', '我喜欢画画、动漫与界面设计')
+            profile2 = runner.current_facts["psychological_profile"]
+            profile2["holland_code_inferred"] = results2["holland_code_inferred"]
+            profile2["core_driver"] = results2["core_driver"]
+            profile2["derived_strengths"] = results2["derived_strengths"]
+            runner.save_facts(runner.current_uid, runner.current_facts)
+            
+            runner.handle_add_major('数字媒体艺术')
+            runner.handle_add_major('视觉传达设计')
+            runner.handle_veto()
+            runner.handle_audit()
+            runner.handle_export()
+        elif sys.argv[1].startswith('/'):
+            # Single-shot command execution
+            cmd_line = ' '.join(sys.argv[1:])
+            runner.execute_command(cmd_line, interactive=False)
+        else:
+            print("❌ Invalid argument. Usage:")
+            print("  python3 runner.py            (runs interactive shell)")
+            print("  python3 runner.py /init [id] (runs a single command)")
     else:
         runner.start_loop()

@@ -1,4 +1,6 @@
 import unittest
+import unittest.mock
+
 import os
 import shutil
 import json
@@ -237,6 +239,156 @@ class TestSanageAxis(unittest.TestCase):
         self.assertIn("志愿偏好与决策演进过程", report_content)
         self.assertIn("Initial Computer Science Selection", report_content)
         self.assertIn("Added Smart Manufacturing", report_content)
+        
+        # Clean up
+        if os.path.exists(session_path):
+            shutil.rmtree(session_path)
+
+    def test_gaokao_mapper(self):
+        from scripts.gaokao_mapper import normalize_province, normalize_stream
+        # 1. Test province normalization
+        self.assertEqual(normalize_province("魔都"), "上海")
+        self.assertEqual(normalize_province("广州"), "广东")
+        self.assertEqual(normalize_province("深圳"), "广东")
+        self.assertEqual(normalize_province("粤"), "广东")
+        # 2. Test stream normalization
+        # Guangdong is 3+1+2 in 2024: "理科" -> "物理"
+        self.assertEqual(normalize_stream("广东", 2024, "理科"), "物理")
+        # Shanghai is 3+3 in 2024: anything -> "综合"
+        self.assertEqual(normalize_stream("上海", 2024, "物理"), "综合")
+        # Sichuan was traditional in 2024: "物理" -> "理科"
+        self.assertEqual(normalize_stream("四川", 2024, "物理"), "理科")
+
+    @unittest.mock.patch('urllib.request.urlopen')
+    def test_sogou_api_and_binary_search(self, mock_urlopen):
+        import urllib.request
+        from scripts.sogou_api import fetch_province_control_lines, fetch_score_range
+        
+        # Mock responses
+        mock_control_json = {
+            "status": 0,
+            "message": "success",
+            "data": {
+                "地区分数线": [
+                    {"录取批次": "本科批", "考生类别": "物理", "分数": "442", "分数查询年份": "2024", "分数线所属地区": "广东"}
+                ]
+            }
+        }
+        mock_range_json = {
+            "status": 0,
+            "message": "success",
+            "data": {
+                "score_range_res": [
+                    {
+                        "选科类别": "物理",
+                        "查询分数线年份": "2024",
+                        "适用地区": "广东",
+                        "查询数据": [
+                            {"返回的查询分数": "700", "同分人数": "10", "排名位次": "50"},
+                            {"返回的查询分数": "600", "同分人数": "50", "排名位次": "200"},
+                            {"返回的查询分数": "500", "同分人数": "100", "排名位次": "1000"}
+                        ]
+                    }
+                ]
+            }
+        }
+        
+        class MockResponse:
+            def __init__(self, json_data):
+                self.json_data = json_data
+            def read(self):
+                return json.dumps(self.json_data).encode('utf-8')
+            def __enter__(self):
+                return self
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                pass
+                
+        # Set side_effect to return MockResponse based on calls
+        mock_urlopen.side_effect = [MockResponse(mock_control_json), MockResponse(mock_range_json), MockResponse(mock_range_json)]
+        
+        # Test Sogou API client
+        control_lines = fetch_province_control_lines("广东", "2024", "物理")
+        self.assertEqual(len(control_lines), 1)
+        self.assertEqual(control_lines[0]["录取批次"], "本科批")
+        
+        # Test binary search rank lookup
+        rank = self.evaluator.get_rank_from_score("广东", 2024, "物理", 600)
+        self.assertEqual(rank, 200)
+        
+        # Test binary search score lookup
+        score = self.evaluator.get_score_from_rank("广东", 2024, "物理", 200)
+        self.assertEqual(score, 600)
+
+    def test_output_generator_compliance(self):
+        student_facts = {
+            "basic_info": {
+                "uid": "test_compliance",
+                "province": "浙江",
+                "track_type": "夏季高考",
+                "subjects": "物理, 化学, 技术",
+                "score_details": {
+                    "culture_score": 650
+                }
+            },
+            "psychological_profile": {
+                "holland_code_inferred": ["I", "R"],
+                "core_driver": "高风险高回报",
+                "derived_strengths": ["数理逻辑"]
+            },
+            "Target Majors": ["人工智能", "软件工程"]
+        }
+        original_evaluate_major = self.generator.evaluator.evaluate_major
+        def mock_evaluate(*args, **kwargs):
+            res = original_evaluate_major(*args, **kwargs)
+            res['match_reasons'].append("我们保证录取此专业。")
+            return res
+        self.generator.evaluator.evaluate_major = mock_evaluate
+        
+        report = self.generator.generate_report(student_facts)
+        self.generator.evaluator.evaluate_major = original_evaluate_major
+        
+        # Check standard disclaimers
+        self.assertIn("🚨 **【AI 辅助说明与免责声明】**", report)
+        # Check dynamic link to Zhejiang Authority
+        self.assertIn("[浙江省教育考试院](https://www.zjzs.net/)", report)
+        # Check dynamic sources section
+        self.assertIn("## 📅 数据来源与时效声明", report)
+        # Check that "保证录取" was sanitized to "录取概率较大"
+        self.assertIn("我们录取概率较大此专业", report)
+        self.assertNotIn("保证录取", report)
+
+    def test_runner_cli_and_set_profile(self):
+        runner = AxisRunner()
+        uid = "test_cli_runner_student"
+        session_path = os.path.join(runner.sessions_dir, uid)
+        
+        if os.path.exists(session_path):
+            shutil.rmtree(session_path)
+            
+        # 1. Test single-shot CLI command execution for init (interactive=False)
+        runner.execute_command(f"/init {uid}", interactive=False)
+        self.assertTrue(os.path.exists(session_path))
+        self.assertEqual(runner.current_uid, uid)
+        
+        # 2. Test setting province, score, and subjects
+        runner.execute_command("/set province 广东")
+        runner.execute_command("/set score 600")
+        runner.execute_command("/set subjects 物理,化学,生物")
+        self.assertEqual(runner.current_facts["basic_info"]["province"], "广东")
+        self.assertEqual(runner.current_facts["basic_info"]["score_details"]["culture_score"], 600)
+        self.assertEqual(runner.current_facts["basic_info"]["subjects"], "物理,化学,生物")
+        
+        # 3. Test setting holland_code and core_driver
+        runner.execute_command("/set holland_code E,S,C")
+        runner.execute_command("/set core_driver 环境优先")
+        
+        profile = runner.current_facts["psychological_profile"]
+        self.assertEqual(profile["holland_code_inferred"], ["E", "S", "C"])
+        self.assertEqual(profile["core_driver"], "环境优先")
+        
+        # 4. Check step completion is Step 4
+        step = runner.get_profile_step(runner.current_facts)
+        self.assertEqual(step, 4)
         
         # Clean up
         if os.path.exists(session_path):
