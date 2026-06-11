@@ -1,0 +1,16 @@
+{
+  "UID": "test_student",
+  "Province": "Henan",
+  "Score / Ranking": "600",
+  "Subject Combination": "物理,化学,生物",
+  "City Preferences": "长三角优先",
+  "Core Interests": "喜欢调试硬件",
+  "Family Background Support": "家庭困难，急需毕业变现",
+  "Financial Expectation": "追求编制或稳定",
+  "Target Universities": [],
+  "Target Majors": [
+    "电气工程及其自动化",
+    "英语",
+    "土木工程"
+  ]
+}
