@@ -6,7 +6,7 @@
 3. Progressive Discovery: Never give a school list before `facts.json` is 100% complete.
 
 ## Skill 路由
-当用户询问高考相关内容时，调用根目录 `SKILL.md`。
+当用户询问高考相关内容时，调用 `skills/axis/SKILL.md`。
 不要直接回答，让 skill 驱动完整流程。
 
 ## 知识文件路径
