@@ -2,10 +2,10 @@ import os
 import json
 import sys
 from datetime import datetime
-from skills.injector import KnowledgeInjector
-from skills.evaluator import MajorEvaluator, SanageAxisEvaluator
-from skills.trait_evaluator import TraitEvaluator
-from skills.output_generator import OutputGenerator
+from scripts.injector import KnowledgeInjector
+from scripts.evaluator import MajorEvaluator, SanageAxisEvaluator
+from scripts.trait_evaluator import TraitEvaluator
+from scripts.output_generator import OutputGenerator
 
 class AxisRunner:
     def __init__(self):

@@ -25,14 +25,14 @@ class KnowledgeInjector:
     def _load_cancelled(self):
         path = os.path.join(self.data_dir, '2026_cancelled_majors.csv')
         if os.path.exists(path):
-            with open(path, mode='r', encoding='utf-8') as f:
+            with open(path, mode='r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 self.cancelled_majors = [row for row in reader]
 
     def _load_added(self):
         path = os.path.join(self.data_dir, '2026_added_majors.csv')
         if os.path.exists(path):
-            with open(path, mode='r', encoding='utf-8') as f:
+            with open(path, mode='r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 self.added_majors = [row for row in reader]
 

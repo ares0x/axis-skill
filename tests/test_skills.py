@@ -2,10 +2,10 @@ import unittest
 import os
 import shutil
 import json
-from skills.injector import KnowledgeInjector
-from skills.evaluator import MajorEvaluator, SanageAxisEvaluator
-from skills.trait_evaluator import TraitEvaluator
-from skills.output_generator import OutputGenerator
+from scripts.injector import KnowledgeInjector
+from scripts.evaluator import MajorEvaluator, SanageAxisEvaluator
+from scripts.trait_evaluator import TraitEvaluator
+from scripts.output_generator import OutputGenerator
 from runner import AxisRunner
 
 class TestSanageAxis(unittest.TestCase):

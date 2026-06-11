@@ -1,10 +1,19 @@
 import os
 import json
-from skills.injector import KnowledgeInjector
+from scripts.injector import KnowledgeInjector
 
 class MajorEvaluator:
     def __init__(self, data_dir=None):
         self.injector = KnowledgeInjector(data_dir=data_dir)
+        self._build_five_year_keywords()
+
+    def _build_five_year_keywords(self):
+        """从 15th_five_year_plan.md 动态提取高频产业关键词"""
+        text = self.injector.five_year_plan
+        import re
+        keywords = re.findall(r'[-*]\s+\*\*(.+?)\*\*', text)
+        keywords += re.findall(r'[-*]\s+(.{2,12})[（(「\n]', text)
+        self.five_year_keywords = list(set(k.strip() for k in keywords if len(k) > 1))
 
         # Hardcoded dictionary for AI replacement rates (0.0 means immune, 1.0 means fully replaceable)
         self.ai_replacement_rates = {
@@ -150,8 +159,7 @@ class MajorEvaluator:
             policy_alignment = 0.1
 
         # Check 15th Five Year Plan markdown file
-        five_year_keywords = ["集成电路", "半导体", "人工智能", "新一代计算", "新能源", "储能", "智能制造", "生物医学", "微电子"]
-        for kw in five_year_keywords:
+        for kw in self.five_year_keywords:
             if kw in major_name:
                 policy_alignment = max(policy_alignment, 0.95)
 
@@ -188,7 +196,7 @@ class MajorEvaluator:
         # A. Check Subject Combinations (物化强约束)
         is_science = any(kw in major_lower for kw in ["computer", "software", "artificial intelligence", "integrated circuit", "semiconductor", "electrical", "grid", "engineering", "manufacturing", "medicine", "dentist", "dentistry", "clinical", "nursing", "储能", "新能源", "芯片", "医学", "工程", "智能", "智能控制", "汽车"])
 
-        if is_science and ("广东春考" not in track_type):
+        if is_science and track_type in ["夏季高考"]:
             has_physics = "物理" in subjects_str or "physics" in major_lower or "physics" in subjects_str.lower()
             has_chemistry = "化学" in subjects_str or "chemistry" in major_lower or "chemistry" in subjects_str.lower()
             if not (has_physics and has_chemistry):

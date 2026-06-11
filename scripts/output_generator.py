@@ -1,5 +1,5 @@
 import os
-from skills.evaluator import MajorEvaluator, SanageAxisEvaluator
+from scripts.evaluator import MajorEvaluator, SanageAxisEvaluator
 
 class OutputGenerator:
     def __init__(self, data_dir=None):
@@ -66,28 +66,7 @@ class OutputGenerator:
         compat_recommendations = compat_evaluator.evaluate_major_compatibility()
 
         # 4. Generate Adversarial Review CoT (后台激辩)
-        adversarial_review = ""
-        if "广东春考" in track_type:
-            adversarial_review = """
-### 🗣️ 后台激辩记录 (Adversarial Debate Log)
-*   **熔断官 (veto_officer)**: "春考专科阶段绝对不能报纯文秘、低端行政或会计！初级白领大盘缩减，报了就是失业。去专科必须读硬核物理手艺！"
-*   **审计官 (audit_officer)**: "同意。考生的优势在于物理交互/动手，且家境需要快速变现。选择深圳职业技术大学的智能控制或新能源汽车维护能做到最高变现性价比。"
-*   **画像官 (profile_officer)**: "考生已对齐事实：放弃传统空调写字楼执念，转向实业手艺。"
-"""
-        elif "艺术" in track_type or "艺考" in track_type:
-            adversarial_review = """
-### 🗣️ 后台激辩记录 (Adversarial Debate Log)
-*   **熔断官 (veto_officer)**: "AI绘画大模型对传统画师和插画岗位蚕食率达80%。绝对不能让考生去选纯美术、视觉传达！"
-*   **审计官 (audit_officer)**: "理解艺术情怀，但必须建立防护墙。建议强制推向1+X复合赛道。选数字媒体艺术或工业设计，在大一必须修Python数据可视化与交互算法。"
-*   **画像官 (profile_officer)**: "同意，方案已调整。已在对冲计划中写入Python和交互算法学习路线。"
-"""
-        else:
-            adversarial_review = f"""
-### 🗣️ 后台激辩记录 (Adversarial Debate Log)
-*   **熔断官 (veto_officer)**: "考生的目标库里有英语和土木工程。英语面临AI大模型重度吞噬（翻译替代率90%）；土木工程面临地产基建大周期滑坡。应予熔断！"
-*   **审计官 (audit_officer)**: "考生分数段处于普通一本区间，家庭困难需要快速变现，且霍兰德代码为 {holland_code}。普通一本纯软件工程已饱和，走‘本科数学 -> 考研跨考AI算法’或者‘电气工程直入电网’才是生存第一的铁律！"
-*   **画像官 (profile_officer)**: "已重构志愿池。熔断英语与土木工程，首选电气工程或数理跨考路径。"
-"""
+        adversarial_review = self._build_adversarial_review(track_type, target_majors, evals, holland_code)
 
         # 5. Build Hedging actions
         hedging_actions = []
@@ -208,3 +187,44 @@ class OutputGenerator:
 `[Current State: Export Ready] - Axis System Output generated successfully.`
 """
         return report
+
+    def _build_adversarial_review(self, track_type, target_majors, evals, holland_code):
+        """
+        根据考生实际情况生成三官激辩，不再是固定字符串。
+        """
+        vetoed = [e for e in evals if e['is_vetoed']]
+        high_risk = [e for e in evals if e['ai_replacement_index'] >= 0.7 and not e['is_vetoed']]
+
+        veto_list = "、".join([e['major'] for e in vetoed]) or "无"
+        risk_list = "、".join([e['major'] for e in high_risk]) or "无"
+        all_majors = "、".join(target_majors)
+
+        # Build dynamic dialogue based on track type
+        if "广东春考" in track_type:
+            return f"""
+### 🗣️ 后台激辩记录 (Adversarial Debate Log)
+- **熔断官 (veto_officer)**：「针对广东春考赛道专科，意向专业为【{all_majors}】。
+  其中【{veto_list}】触发硬性熔断——春考专科阶段绝对不能报纯白领流水线岗位，AI替代率高且招聘大盘趋近归零！」
+- **生存审计官 (audit_officer)**：「同意熔断官意见。考生需要快速变现，且霍兰德代码为 {holland_code}，应全面转向大湾区实体手艺产业专科，如智能控制或新能源汽车维护。」
+- **用户画像官 (profile_officer)**：「已重构志愿。熔断高危专科，转向实业手艺专业。」
+"""
+        elif "艺术" in track_type or "艺考" in track_type:
+            return f"""
+### 🗣️ 后台激辩记录 (Adversarial Debate Log)
+- **熔断官 (veto_officer)**：「设计类艺考意向专业为【{all_majors}】。
+  AI绘画对传统原画/插画的蚕食率已达80%，普通视觉传达和美术专业存在高AI替代风险。」
+- **生存审计官 (audit_officer)**：「理解艺术偏好，但必须增加防线。对于【{risk_list}】建议推向1+X复合赛道（如数字媒体艺术或工业设计），大学第一年必须选修交互算法和可视化工具。」
+- **用户画像官 (profile_officer)**：「同意，X对冲策略已在报告后部列出，已注入Python和交互课程对冲路线。」
+"""
+        else:
+            reason_str = vetoed[0]['veto_reasons'][0] if vetoed else '暂无强制熔断项'
+            return f"""
+### 🗣️ 后台激辩记录 (Adversarial Debate Log)
+- **熔断官 (veto_officer)**：「高考统招考生，意向专业为【{all_majors}】。
+  其中【{veto_list}】触发硬性熔断——
+  {reason_str}」
+- **生存审计官 (audit_officer)**：「熔断之外，【{risk_list}】虽未熔断但AI替代率偏高。
+  结合考生 Holland 代码 {holland_code}，
+  {'建议走数理降维跨考路径（规则五）' if 'I' in holland_code else '建议强化物理世界实业壁垒（规则六）'}」
+- **用户画像官 (profile_officer)**：「综合两方意见，本案优先方向已调整，剩余方案见下方推荐清单。」
+"""
