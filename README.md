@@ -10,29 +10,73 @@
 ## 🛠️ Repository Directory
 
 - `SKILL.md` — Agent 总入口与触发约束。
-- `.agents/skills/` — 子 Skill 配置：
+- `skills/` — 子 Skill 配置：
   - `profile/SKILL.md` — 信息采集（分数、选科、春考/夏考分流、8题Holland性格测试）。
   - `analyze/SKILL.md` — 推理分析（三官激辩后台对抗 review、张雪峰跨考降维规则比对）。
-  - `report/SKILL.md` — 输出格式规范（生成 1+X 报告）。
+  - `report/SKILL.md` — 输出格式规范（生成包含志愿演进的 1+X 报告）。
+  - `save/SKILL.md` — [NEW] 状态存档子 Skill。
+  - `restore/SKILL.md` — [NEW] 状态接续子 Skill。
+  - `list/SKILL.md` — [NEW] 历史快照与学生会话列表子 Skill。
 - `scripts/` — 底层工具包（`evaluator.py`, `injector.py`, `trait_evaluator.py`, `output_generator.py`）。
-- `data/` — 专家决策规则与投档线库（新增 `score_lines_2024_2025.csv`）。
+- `data/` — 专家决策规则与投档线库。
 
 ---
 
-## 🚀 使用方法（Claude Code / claude.ai）
+## 🔧 安装方法 (Installation Methods)
 
-AI 智能体检测到报考、高考、选专业等关键词时会自动激活该 Skill，或由用户直接输入命令运行：
+由于本项目已包含 `.claude-plugin/marketplace.json` 元数据配置并对子技能目录进行了 `skills/` 重构，支持以下一键安装方式：
 
+### 1. Claude Code 插件式安装
+在支持 `claude` 终端命令的客户端下，直接运行以下命令：
 ```bash
-# 激活本顾问
-/axis
+# 从 GitHub 仓库直接作为插件添加（请将 ares0x/axis-skill 替换为你的实际仓库路径）
+claude plugin marketplace add ares0x/axis-skill
+
+# 或直接安装特定注册的技能名
+claude plugin install axis@axis-skills
 ```
 
-然后，直接发送您的请求开始：
-> 「我今年高考 560 分，广东，物化生，帮我分析一下专业选择」
+### 2. 通用全局安装（适用于 Codex / Claude Code 等）
+通过 `skills` 技能管理器进行全局添加：
+```bash
+npx -y skills add ares0x/axis-skill -g --all
+```
 
-智能体将通过以下调用链进行计算与输出：
-`/axis` (入口) $\rightarrow$ `/profile` (信息采集) $\rightarrow$ `/analyze` (激辩与推理) $\rightarrow$ `/report` (输出 1+X 方案报告)
+### 3. 本地集成（推荐开发者使用）
+直接克隆本项目到你的开发工作区：
+```bash
+git clone https://github.com/ares0x/axis-skill.git
+```
+克隆后在此目录下启动 `claude` 命令行，Claude Code 会通过根目录的 `CLAUDE.md` 与 `SKILL.md` 自动无缝识别并挂载本 Skill 决策引擎。
+
+---
+
+## 🚀 使用方法与命令行菜单 (Command Menu)
+
+本 Skill 配套了确定性的 Python 计算引擎。你可以直接在终端中交互式运行 `python3 runner.py` 或让 AI 智能体（如 Claude Code 或 claude.ai）通过调用子 Skill 运行以下指令：
+
+| 命令 | 说明 | 示例 |
+|---|---|---|
+| `/init [uid]` | 初始化或载入考生 facts 档案 | `/init student_jace` |
+| `/set [key] [val]` | 设置画像数据（province, track, score, art_rank, subjects） | `/set province 广东` |
+| `/explore` | 启动 Holland 霍兰德职业性格与 Gallup 优势测评 | `/explore` |
+| `/add_major [major]` | 向考生目标专业候选池添加意向专业 | `/add_major 智能控制技术` |
+| `/status` | 检查当前考生的画像完整度与省控线对比状态 | `/status` |
+| `/veto` | 运行风险熔断官（查杀 AI 替代率及教育部撤销名单） | `/veto` |
+| `/audit` | 运行生存审计官（分析变现周期、家庭经济条件、城市优先权） | `/audit` |
+| `/save [title]` | [NEW] 保存当前考生状态为快照存档 | `/save 初始偏好排查` |
+| `/restore [arg]` | [NEW] 从特定快照中恢复考生 facts 与专业池（可传序号或标题） | `/restore 1` |
+| `/list` | [NEW] 列出当前考生的历史存档快照，以及其他可切换的考生会话 | `/list` |
+| `/report` | [NEW] 整合多次快照的志愿演进轨迹，编译输出最终 1+X 生存报告 | `/report` |
+| `/help` | 查看命令帮助菜单 | `/help` |
+| `/exit` | 退出交互式控制台 | `/exit` |
+
+### 智能体运行链路
+
+AI 智能体检测到报考、高考、选专业等关键词时会自动激活该 Skill，或由用户直接输入命令运行。智能体将通过以下调用链进行计算与输出：
+`/axis` (入口) $\rightarrow$ `/profile` (信息采集) $\rightarrow$ `/analyze` (激辩与推理) $\rightarrow$ `/save` (存档备忘) $\rightarrow$ `/report` (编译输出包含决策演进的 1+X 报告)
+
+---
 
 ---
 

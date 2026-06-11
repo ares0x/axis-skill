@@ -5,6 +5,8 @@ description: |
   志愿填报策略、AI时代专业生存分析时触发。触发关键词：
   高考、志愿、专业、录取、报考、选专业、填志愿、高考完了、
   出分了、分数、位次、选学校、广东春考、艺考。
+allowed-tools:
+  - execute_bash
 ---
 
 # sanage Axis — 高考志愿 AI 顾问
@@ -26,10 +28,28 @@ description: |
 
 - `data/alpha_expert_rules.md` — 张雪峰流派七条核心决策规则
 - `data/15th_five_year_plan.md` — 十五五产业规划关键词库
-- `data/regional_specials.md` — 地方特殊赛道政策（广东春考/艺考等）
+- `data/regional_specials.md` — 地方特殊赛道政策（广东春考/艺考等及全国七类招生大类）
+- `data/province_control_lines.csv` — 2023-2025年全国各省高考各批次省控分数线
 - `data/2026_cancelled_majors.csv` — 教育部撤销专业名单
 - `data/2026_added_majors.csv` — 教育部新增战略专业名单
 - `data/score_lines_2024_2025.csv` — 历年省市高校专业录取最低分数线与位次
+
+## 脚本命令与工具指南 (Executable Tools & Commands)
+
+本 Skill 配套了确定性的 Python 计算引擎。你可以通过 `execute_bash` 工具运行 `python3 runner.py` 进行数据计算与状态管理。支持的命令如下：
+
+- `/init [uid]` — 在工作区初始化一个考生的 facts 会话。
+- `/set [key] [val]` — 设置考生的画像数据（键名包括 `province`, `track`, `score`, `subjects`）。
+- `/add_major [major]` — 向考生的目标专业候选池添加一项志愿专业。
+- `/veto` — 调用 `scripts/evaluator.py` 对候选专业进行教育部撤销及 AI 高替代熔断审查。
+- `/audit` — 执行家庭资源、变现周期与省控批次线差值比对审计。
+- `/save [title]` — 将当前考生的评估进度、志愿和设定状态存盘为快照。
+- `/restore [arg]` — 从快照恢复考生的详细数据（可通过编号、文件名或名称模糊匹配）。
+- `/list` — 列出当前考生的历史存档快照，以及其他可切换的考生文件夹。
+- `/report` — 整合多阶段快照，生成带有历史选择演进轨迹的 1+X 生存报告。
+- `/export` — 结合霍兰德与赛道匹配计算，生成最终 1+X 报告并存盘。
+
+**大模型决策规则**：请优先通过终端命令执行 `python3 runner.py` 来处理用户状态，以防止大模型手动计算和过滤产生幻觉。
 
 ## 路由规则
 
@@ -38,6 +58,9 @@ description: |
 | 用户信息不完整（缺少省份、赛道、成绩、选科、或**职业性格/霍兰德兴趣、求职驱动/深造预期**等任何一项） | invoke `/profile` 并按顺序问清或启动 8 题霍兰德测评 |
 | 信息完整（已包含：省份、赛道、成绩、选科，以及**职业性格/霍兰德代码、求职驱动/深造预期**） | invoke `/analyze` 进行决策激辩并评估专业 |
 | 分析完成，需要输出最终 1+X 生存方案 | invoke `/report` 并将报告保存至 `workspace/sessions/{uid}/survival_report.md` |
+| 用户显式要求保存、存档、记下来当前状态或结论 | invoke `/save` 存为快照文件 |
+| 用户要求回到上次、接着上次、恢复之前状态 | invoke `/restore` 从快照文件恢复 facts 会话 |
+| 用户要求看有哪些存档、有哪些学生、列出快照 | invoke `/list` 展示所有快照和会话目录 |
 
 ## State Guard (状态守卫)
 

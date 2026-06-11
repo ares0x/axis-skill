@@ -1,15 +1,101 @@
 import os
+import json
 from scripts.evaluator import MajorEvaluator, SanageAxisEvaluator
+
+def parse_markdown_with_frontmatter(content):
+    frontmatter = {}
+    body = ""
+    lines = content.splitlines()
+    if len(lines) > 0 and lines[0].strip() == "---":
+        yaml_lines = []
+        body_lines = []
+        in_yaml = True
+        for line in lines[1:]:
+            if in_yaml:
+                if line.strip() == "---":
+                    in_yaml = False
+                else:
+                    yaml_lines.append(line)
+            else:
+                body_lines.append(line)
+        body = "\n".join(body_lines)
+        
+        # Simple key-value parser
+        for line in yaml_lines:
+            if ":" in line:
+                key, val = line.split(":", 1)
+                key = key.strip()
+                val = val.strip()
+                if (val.startswith("[") and val.endswith("]")) or (val.startswith("['") and val.endswith("']")) or (val.startswith('["') and val.endswith('"]')):
+                    import ast
+                    try:
+                        val = ast.literal_eval(val)
+                    except:
+                        val = [item.strip().strip("'\"") for item in val[1:-1].split(",") if item.strip()]
+                elif val.startswith('"') and val.endswith('"'):
+                    val = val[1:-1]
+                elif val.startswith("'") and val.endswith("'"):
+                    val = val[1:-1]
+                elif val.isdigit():
+                    val = int(val)
+                frontmatter[key] = val
+    else:
+        body = content
+    return frontmatter, body
 
 class OutputGenerator:
     def __init__(self, data_dir=None):
         self.evaluator = MajorEvaluator(data_dir=data_dir)
 
-    def generate_report(self, student_facts):
+    def generate_report(self, student_facts, snapshots_dir=None):
         """
-        Generate the final "1+X" action list under the v3.0 specification.
+        Generate the final "1+X" action list under the v3.0 specification,
+        incorporating cumulative history if snapshots exist.
         """
-        # 1. Safely unpack nested or flat schemas
+        # 1. Parse evolution section from snapshots
+        evolution_section = ""
+        if snapshots_dir and os.path.exists(snapshots_dir):
+            snapshot_files = sorted([f for f in os.listdir(snapshots_dir) if f.endswith('.md')])
+            if len(snapshot_files) >= 1:
+                evolution_section = "\n## 📈 志愿偏好与决策演进过程 (Counseling Preference Evolution)\n\n"
+                evolution_section += "在咨询评估过程中，考生的报考志愿经历以下调整：\n\n"
+                
+                for idx, filename in enumerate(snapshot_files, 1):
+                    filepath = os.path.join(snapshots_dir, filename)
+                    with open(filepath, 'r', encoding='utf-8') as sf:
+                        content = sf.read()
+                    fm, body = parse_markdown_with_frontmatter(content)
+                    title = fm.get("title", filename)
+                    timestamp = filename[:15]
+                    if len(timestamp) == 15 and timestamp[8] == '-':
+                        formatted_ts = f"{timestamp[:4]}-{timestamp[4:6]}-{timestamp[6:8]} {timestamp[9:11]}:{timestamp[11:13]}"
+                    else:
+                        formatted_ts = timestamp
+                    
+                    # Parse target majors
+                    target_majors = []
+                    in_targets = False
+                    for line in body.splitlines():
+                        line_strip = line.strip()
+                        if line_strip.startswith("## 目标专业候选池"):
+                            in_targets = True
+                            continue
+                        elif line_strip.startswith("##"):
+                            in_targets = False
+                        if in_targets:
+                            if line_strip.startswith("-"):
+                                major = line_strip[1:].strip()
+                                if major and major != "（暂无）":
+                                    target_majors.append(major)
+                                    
+                    majors_str = "、".join(target_majors) if target_majors else "无"
+                    evolution_section += f"- **阶段 {idx} ({formatted_ts})** · *{title}*  \n"
+                    evolution_section += f"  - 目标专业候选池: `{majors_str}`  \n"
+                    evolution_section += f"  - 状态阶段: `{fm.get('stage', '未标记')}`\n"
+                
+                evolution_section += "\n---\n"
+
+        # 2. Safely unpack nested or flat schemas
         if "basic_info" in student_facts:
             uid = student_facts["basic_info"].get("uid", "unknown")
             province = student_facts["basic_info"].get("province", "未知")
@@ -33,6 +119,9 @@ class OutputGenerator:
             core_driver = student_facts.get("Financial Expectation") or student_facts.get("core_driver", "普通期望")
             blind_spots = student_facts.get("blind_spots", [])
             derived_strengths = student_facts.get("derived_strengths", [])
+
+        # Get batch lines status
+        batch_line_status = self.evaluator.get_batch_lines_status(student_facts)
 
         # Get target majors
         target_majors = student_facts.get("Target Majors", [])
@@ -116,6 +205,7 @@ class OutputGenerator:
 - **填报赛道**: {track_type}
 - **分数/省排名**: {score}
 - **选科组合**: {subjects}
+- **省控批次线对比**: {batch_line_status}
 
 ## 🧠 职业性格与天赋诊断 (Talent Profile)
 - **推导霍兰德代码 (Holland Code)**: {holland_code}
@@ -128,7 +218,11 @@ class OutputGenerator:
 {adversarial_review}
 
 ---
+"""
+        if evolution_section:
+            report += evolution_section
 
+        report += f"""
 ## 🎯 核心行动方案 [1]：首选生存专业
 - **推荐专业**: **{primary_major}**
 """

@@ -171,5 +171,76 @@ class TestSanageAxis(unittest.TestCase):
         if os.path.exists(session_path):
             shutil.rmtree(session_path)
 
+    def test_runner_snapshots(self):
+        runner = AxisRunner()
+        uid = "test_snapshot_student"
+        session_path = os.path.join(runner.sessions_dir, uid)
+        
+        if os.path.exists(session_path):
+            shutil.rmtree(session_path)
+            
+        runner.handle_init(uid, interactive=False)
+        runner.handle_set("province 浙江")
+        runner.handle_set("track 夏季高考")
+        runner.handle_set("score 610")
+        runner.handle_set("subjects 物理,化学,技术")
+        runner.handle_add_major("计算机科学与技术")
+        
+        # Save snapshot 1
+        runner.handle_save("Initial Computer Science Selection")
+        
+        # Verify snapshot 1 exists
+        snapshots_dir = os.path.join(session_path, 'snapshots')
+        self.assertTrue(os.path.exists(snapshots_dir))
+        snapshot_files = sorted([f for f in os.listdir(snapshots_dir) if f.endswith('.md')])
+        self.assertEqual(len(snapshot_files), 1)
+        
+        # Sleep for a bit to ensure a different timestamp prefix (second resolution)
+        import time
+        time.sleep(1.1)
+        
+        # Change state
+        runner.handle_add_major("智能制造工程")
+        runner.handle_save("Added Smart Manufacturing")
+        
+        snapshot_files = sorted([f for f in os.listdir(snapshots_dir) if f.endswith('.md')])
+        self.assertEqual(len(snapshot_files), 2)
+        
+        # Test listing
+        runner.handle_list()
+        
+        # Modify current memory state and restore
+        runner.current_facts["basic_info"]["province"] = "北京"
+        runner.save_facts(uid, runner.current_facts)
+        
+        # Restore to snapshot 1 (index 1)
+        runner.handle_restore("1")
+        
+        # Verify state is restored to Zhejiang
+        self.assertEqual(runner.current_facts["basic_info"]["province"], "浙江")
+        self.assertIn("计算机科学与技术", runner.current_facts["Target Majors"])
+        
+        # Restore to latest
+        runner.handle_restore("")
+        self.assertIn("智能制造工程", runner.current_facts["Target Majors"])
+        
+        # Test cumulative report contains evolution stages
+        runner.current_facts["psychological_profile"]["holland_code_inferred"] = ["I", "R"]
+        runner.current_facts["psychological_profile"]["core_driver"] = "高风险高回报"
+        runner.save_facts(uid, runner.current_facts)
+        
+        runner.handle_report()
+        report_path = os.path.join(session_path, 'survival_report.md')
+        self.assertTrue(os.path.exists(report_path))
+        with open(report_path, 'r', encoding='utf-8') as f:
+            report_content = f.read()
+        self.assertIn("志愿偏好与决策演进过程", report_content)
+        self.assertIn("Initial Computer Science Selection", report_content)
+        self.assertIn("Added Smart Manufacturing", report_content)
+        
+        # Clean up
+        if os.path.exists(session_path):
+            shutil.rmtree(session_path)
+
 if __name__ == '__main__':
     unittest.main()

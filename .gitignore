@@ -7,7 +7,6 @@ make-pdf/dist/
 .claude/skills/
 .claude/scheduled_tasks.lock
 .claude/*.lock
-.agents/
 .factory/
 .kiro/
 .opencode/
@@ -34,3 +33,16 @@ supabase/.temp/
 docs/throughput-*.json
 
 .sources/
+
+# System and IDE Files
+.DS_Store
+**/.DS_Store
+.ropeproject/
+
+# Python Caches
+__pycache__/
+*.pyc
+
+# Local Student Sessions (keep example_session template)
+workspace/sessions/*
+!workspace/sessions/example_session/

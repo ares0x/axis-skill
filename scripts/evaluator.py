@@ -137,6 +137,48 @@ class MajorEvaluator:
                 return rate
         return 0.50  # Default moderate stability
 
+    def get_batch_lines_status(self, student_facts, year=2024):
+        """
+        Evaluate student score against provincial control batch lines.
+        """
+        if "basic_info" in student_facts:
+            info = student_facts["basic_info"]
+            province = info.get("province", "")
+            track_type = info.get("track_type", "")
+            score = info.get("score_details", {}).get("culture_score")
+        else:
+            province = student_facts.get("Province", "")
+            track_type = student_facts.get("track_type") or student_facts.get("Track Type", "")
+            score = student_facts.get("Score / Ranking")
+            
+        try:
+            score = int(score)
+        except (ValueError, TypeError):
+            return "无法解析分数，不作对比。"
+
+        if not province or not track_type:
+            return "省份或科类缺失，无法对比。"
+
+        # Search for lines
+        lines = self.injector.get_province_control_line(province, track_type, year=year)
+        if not lines:
+            # Try 2025 as fallback
+            lines = self.injector.get_province_control_line(province, track_type, year=2025)
+            if not lines:
+                return "暂未收录该省份的批次线。"
+
+        status_messages = []
+        for line in lines:
+            try:
+                line_score = int(line.get('control_score'))
+                batch_name = line.get('batch_name')
+                diff = score - line_score
+                diff_str = f"+{diff}" if diff >= 0 else f"{diff}"
+                status_messages.append(f"{batch_name}: {line_score}分(差值:{diff_str})")
+            except (ValueError, TypeError):
+                continue
+        return " | ".join(status_messages)
+
     def evaluate_major(self, major_name, student_facts, institution_level="Ordinary"):
         """
         Evaluate major survival metrics and fit with student facts.

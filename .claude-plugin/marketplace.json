@@ -1,0 +1,82 @@
+{
+  "name": "axis-skills",
+  "owner": {
+    "name": "ares0x"
+  },
+  "metadata": {
+    "description": "sanage Axis 高考志愿 AI 顾问技能包",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "axis",
+      "description": "高考志愿选择顾问主入口。当用户询问高考报考、院校推荐、选专业等时触发。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "education",
+      "keywords": ["gaokao", "counseling", "university", "major", "chinese"],
+      "skills": ["./"]
+    },
+    {
+      "name": "profile",
+      "description": "高考生基础信息采集与快速性格测评。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "education",
+      "keywords": ["profile", "holland-quiz", "counseling", "chinese"],
+      "skills": ["./skills/profile"]
+    },
+    {
+      "name": "analyze",
+      "description": "高考志愿深度分析与三官激辩评估。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "education",
+      "keywords": ["analyze", "adversarial-review", "veto", "audit", "chinese"],
+      "skills": ["./skills/analyze"]
+    },
+    {
+      "name": "report",
+      "description": "输出带决策演进的高考志愿 1+X 生存方案报告。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "education",
+      "keywords": ["report", "export", "chinese"],
+      "skills": ["./skills/report"]
+    },
+    {
+      "name": "save",
+      "description": "保存当前高考评估状态为快照。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "state-management",
+      "keywords": ["save", "snapshot", "chinese"],
+      "skills": ["./skills/save"]
+    },
+    {
+      "name": "restore",
+      "description": "恢复此前保存的考生状态与志愿池。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "state-management",
+      "keywords": ["restore", "recall", "chinese"],
+      "skills": ["./skills/restore"]
+    },
+    {
+      "name": "list",
+      "description": "列出当前考生的历史存档快照，以及其他可切换的考生会话。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "state-management",
+      "keywords": ["list", "sessions", "chinese"],
+      "skills": ["./skills/list"]
+    }
+  ]
+}

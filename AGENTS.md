@@ -5,10 +5,13 @@ This file serves as a reference catalog for AI agents (e.g. Claude Code or claud
 ## 📁 Repository Map
 
 - `SKILL.md` — The main root entrypoint for triggering the高考志愿顾问 service.
-- `.agents/skills/` — The directory hosting specialized subskills:
+- `skills/` — The directory hosting specialized subskills:
   - `profile/SKILL.md` — Information collection protocols & interactive personality diagnostic scripts.
   - `analyze/SKILL.md` — Utilization matching rules & three-officer backend adversarial review.
   - `report/SKILL.md` — Formatting requirements for outputting the final 1+X roadmap.
+  - `save/SKILL.md` — Session snapshot saving subskill.
+  - `restore/SKILL.md` — Session snapshot restoring subskill.
+  - `list/SKILL.md` — Snapshot and candidate list subskill.
 - `scripts/` — Tool scripts for computing math models:
   - `evaluator.py` — Survival scores and compatibility ranks.
   - `injector.py` — Database lookups.

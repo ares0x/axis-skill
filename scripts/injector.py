@@ -11,6 +11,7 @@ class KnowledgeInjector:
         
         self.cancelled_majors = []
         self.added_majors = []
+        self.province_control_lines = []
         self.five_year_plan = ""
         self.expert_rules = ""
         
@@ -19,6 +20,7 @@ class KnowledgeInjector:
     def load_all(self):
         self._load_cancelled()
         self._load_added()
+        self._load_province_control_lines()
         self._load_five_year_plan()
         self._load_expert_rules()
 
@@ -35,6 +37,13 @@ class KnowledgeInjector:
             with open(path, mode='r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 self.added_majors = [row for row in reader]
+
+    def _load_province_control_lines(self):
+        path = os.path.join(self.data_dir, 'province_control_lines.csv')
+        if os.path.exists(path):
+            with open(path, mode='r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                self.province_control_lines = [row for row in reader]
 
     def _load_five_year_plan(self):
         path = os.path.join(self.data_dir, '15th_five_year_plan.md')
@@ -77,6 +86,32 @@ class KnowledgeInjector:
             if major_name_lower in full_name_lower or any(part in major_name_lower for part in full_name_lower.replace('(', ' ').replace(')', ' ').split() if len(part) > 1):
                 return row
         return None
+
+    def get_province_control_line(self, province, track_type, year=2024):
+        """
+        Lookup control score lines for a given province and track.
+        """
+        results = []
+        year_str = str(year)
+        prov_clean = province.strip()
+        track_clean = track_type.strip()
+        
+        # Determine normalized track inside CSV (e.g., 理科, 物理类)
+        csv_tracks = []
+        if "物理" in track_clean:
+            csv_tracks = ["物理类", "理科", "不分科"]
+        elif "历史" in track_clean or "文科" in track_clean:
+            csv_tracks = ["历史类", "文科", "不分科"]
+        elif "春考" in track_clean:
+            csv_tracks = ["物理类", "历史类", "不分科"]
+        else:
+            csv_tracks = [track_clean, "理科", "物理类", "不分科"]
+
+        for row in self.province_control_lines:
+            if row.get('province') == prov_clean and row.get('year') == year_str:
+                if row.get('track_type') in csv_tracks:
+                    results.append(row)
+        return results
 
     def get_policy_context_for_prompt(self):
         """

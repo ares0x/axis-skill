@@ -5,7 +5,7 @@ from datetime import datetime
 from scripts.injector import KnowledgeInjector
 from scripts.evaluator import MajorEvaluator, SanageAxisEvaluator
 from scripts.trait_evaluator import TraitEvaluator
-from scripts.output_generator import OutputGenerator
+from scripts.output_generator import OutputGenerator, parse_markdown_with_frontmatter
 
 class AxisRunner:
     def __init__(self):
@@ -217,6 +217,9 @@ class AxisRunner:
         print(f"Culture Score (文化分): {info.get('score_details', {}).get('culture_score') or '[Missing]'}")
         print(f"Art Rank (艺术省排名): {info.get('score_details', {}).get('art_province_ranking') or '[Missing]'}")
         print(f"Subjects (选科): {info.get('subjects') or '[Missing]'}")
+        if info.get("province") and info.get("track_type") and info.get("score_details", {}).get("culture_score"):
+            status = self.evaluator.get_batch_lines_status(self.current_facts)
+            print(f"Province Control Lines (省控线对比): {status}")
         print(f"Holland Code (霍兰德人格): {profile.get('holland_code_inferred') or '[Missing]'}")
         print(f"Core Driver (核心求职驱力): {profile.get('core_driver') or '[Missing]'}")
         print(f"Strengths (长板优势): {profile.get('derived_strengths') or '[]'}")
@@ -424,7 +427,8 @@ class AxisRunner:
             return
             
         print("\n📦 Generating '1+X' future survival report...")
-        report = self.generator.generate_report(self.current_facts)
+        snapshots_dir = os.path.join(self.sessions_dir, self.current_uid, 'snapshots')
+        report = self.generator.generate_report(self.current_facts, snapshots_dir=snapshots_dir)
         
         # Save to file
         report_path = os.path.join(self.sessions_dir, self.current_uid, 'survival_report.md')
@@ -438,6 +442,213 @@ class AxisRunner:
         print(report)
         print("="*60 + "\n")
         print("[Current State: Export Ready]")
+
+    def handle_save(self, title):
+        """Save candidate facts and state to a snapshot."""
+        if not self.current_uid:
+            print("❌ Please initialize a student session first with `/init [uid]`.")
+            return
+            
+        import re
+        title_clean = title.strip()
+        title_slug = re.sub(r'[^a-zA-Z0-9\u4e00-\u9fa5]+', '-', title_clean).strip('-')
+        if not title_slug:
+            title_slug = "untitled"
+            
+        timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+        filename = f"{timestamp}-{title_slug}.md"
+        
+        snapshots_dir = os.path.join(self.sessions_dir, self.current_uid, 'snapshots')
+        os.makedirs(snapshots_dir, exist_ok=True)
+        
+        filepath = os.path.join(snapshots_dir, filename)
+        
+        info = self.current_facts.get("basic_info", {})
+        profile = self.current_facts.get("psychological_profile", {})
+        target_majors = self.current_facts.get("Target Majors", [])
+        
+        iso_timestamp = datetime.now().astimezone().isoformat(timespec='seconds')
+        step = self.get_profile_step(self.current_facts)
+        stage = f"Profile Step {step}/4"
+        if step == 4:
+            stage = "Profile Complete"
+            
+        # Serialize YAML frontmatter
+        yaml_lines = [
+            "---",
+            f"uid: {self.current_uid}",
+            f"timestamp: '{iso_timestamp}'",
+            f"title: '{title_clean}'",
+            f"province: '{info.get('province', '')}'",
+            f"track: '{info.get('track_type', '')}'",
+            f"score: {info.get('score_details', {}).get('culture_score', 0)}",
+            f"art_rank: {info.get('score_details', {}).get('art_province_ranking', 0)}",
+            f"subjects: '{info.get('subjects', '')}'",
+            f"holland_code: {json.dumps(profile.get('holland_code_inferred', []), ensure_ascii=False)}",
+            f"core_driver: '{profile.get('core_driver', '')}'",
+            f"stage: '{stage}'",
+            "---"
+        ]
+        
+        # Body sections
+        body_lines = [
+            f"# Snapshot: {title_clean}",
+            "",
+            "## 目标专业候选池",
+            ""
+        ]
+        for major in target_majors:
+            body_lines.append(f"- {major}")
+        if not target_majors:
+            body_lines.append("- （暂无）")
+            
+        body_lines.extend([
+            "",
+            "## 备注",
+            "",
+            f"This snapshot was automatically saved on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
+        ])
+        
+        content = "\n".join(yaml_lines) + "\n\n" + "\n".join(body_lines)
+        
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(content)
+            
+        self.log_timeline(self.current_uid, f"Saved snapshot: '{filename}' with title '{title_clean}'")
+        
+        # Count snapshots
+        snapshot_files = [f for f in os.listdir(snapshots_dir) if f.endswith('.md')]
+        print(f"已存档：workspace/sessions/{self.current_uid}/snapshots/{filename}")
+        print(f"当前项目下共 {len(snapshot_files)} 份存档。")
+
+    def handle_restore(self, arg=""):
+        """Restore candidate details and target majors from a snapshot."""
+        if not self.current_uid:
+            print("❌ Please initialize a student session first with `/init [uid]`.")
+            return
+            
+        snapshots_dir = os.path.join(self.sessions_dir, self.current_uid, 'snapshots')
+        if not os.path.exists(snapshots_dir):
+            print(f"❌ '{self.current_uid}' has no saved snapshots. Save one using `/save [title]`.")
+            return
+            
+        snapshot_files = sorted([f for f in os.listdir(snapshots_dir) if f.endswith('.md')])
+        if not snapshot_files:
+            print(f"❌ '{self.current_uid}' has no saved snapshots. Save one using `/save [title]`.")
+            return
+            
+        target_file = None
+        if not arg:
+            # Load latest
+            target_file = snapshot_files[-1]
+        else:
+            arg_str = arg.strip()
+            if arg_str.isdigit():
+                idx = int(arg_str) - 1
+                if 0 <= idx < len(snapshot_files):
+                    target_file = snapshot_files[idx]
+                else:
+                    print(f"❌ Invalid snapshot index. '{self.current_uid}' has {len(snapshot_files)} snapshots.")
+                    return
+            else:
+                # Match by title or file name
+                for f in snapshot_files:
+                    if arg_str in f:
+                        target_file = f
+                        break
+                if not target_file:
+                    print(f"❌ Could not find snapshot matching '{arg_str}'.")
+                    return
+                    
+        filepath = os.path.join(snapshots_dir, target_file)
+        with open(filepath, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        frontmatter, body = parse_markdown_with_frontmatter(content)
+        
+        # Restore basic info
+        info = self.current_facts["basic_info"]
+        info["province"] = frontmatter.get("province", "")
+        info["track_type"] = frontmatter.get("track", "")
+        info["subjects"] = frontmatter.get("subjects", "")
+        if "score" in frontmatter:
+            info["score_details"]["culture_score"] = int(frontmatter["score"])
+        if "art_rank" in frontmatter:
+            info["score_details"]["art_province_ranking"] = int(frontmatter["art_rank"])
+            
+        # Restore psychological profile
+        profile = self.current_facts["psychological_profile"]
+        profile["holland_code_inferred"] = frontmatter.get("holland_code", [])
+        profile["core_driver"] = frontmatter.get("core_driver", "")
+        
+        # Parse target majors from body
+        target_majors = []
+        in_targets = False
+        for line in body.splitlines():
+            line_strip = line.strip()
+            if line_strip.startswith("## 目标专业候选池"):
+                in_targets = True
+                continue
+            elif line_strip.startswith("##"):
+                in_targets = False
+            if in_targets:
+                if line_strip.startswith("-"):
+                    major = line_strip[1:].strip()
+                    if major and major != "（暂无）":
+                        target_majors.append(major)
+                        
+        self.current_facts["Target Majors"] = target_majors
+        self.save_facts(self.current_uid, self.current_facts)
+        
+        self.log_timeline(self.current_uid, f"Restored state from snapshot: '{target_file}'")
+        print(f"✅ Restored state from snapshot: {target_file}")
+        self.print_status()
+
+    def handle_list(self):
+        """List active snapshots and candidate folders."""
+        print("\n================ AVAILABLE SESSIONS & SNAPSHOTS ================")
+        if self.current_uid:
+            print(f"Active Candidate: {self.current_uid}")
+            snapshots_dir = os.path.join(self.sessions_dir, self.current_uid, 'snapshots')
+            if os.path.exists(snapshots_dir):
+                snapshot_files = sorted([f for f in os.listdir(snapshots_dir) if f.endswith('.md')])
+                if snapshot_files:
+                    print("Snapshots:")
+                    for idx, filename in enumerate(snapshot_files, 1):
+                        filepath = os.path.join(snapshots_dir, filename)
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        fm, _ = parse_markdown_with_frontmatter(content)
+                        title = fm.get("title", filename)
+                        timestamp = filename[:15]
+                        if len(timestamp) == 15 and timestamp[8] == '-':
+                            formatted_ts = f"{timestamp[:4]}-{timestamp[4:6]}-{timestamp[6:8]} {timestamp[9:11]}:{timestamp[11:13]}"
+                        else:
+                            formatted_ts = timestamp
+                        stage = fm.get("stage", "Unknown")
+                        print(f"  {idx}. {formatted_ts} · {title} · {stage}")
+                else:
+                    print("Snapshots: (No snapshots found. Save with `/save [title]`)")
+            else:
+                print("Snapshots: (No snapshots folder found)")
+        else:
+            print("Active Candidate: [None] (Run `/init [uid]` to select/create a candidate)")
+            
+        if os.path.exists(self.sessions_dir):
+            candidates = sorted([d for d in os.listdir(self.sessions_dir) if os.path.isdir(os.path.join(self.sessions_dir, d))])
+            other_candidates = [c for c in candidates if c != self.current_uid]
+            if other_candidates:
+                print("\nOther Candidates:")
+                for c in other_candidates:
+                    print(f"  - {c}")
+            else:
+                if not self.current_uid:
+                    print("\nNo candidate sessions found.")
+        print("================================================================\n")
+
+    def handle_report(self):
+        """Compile reports from active candidate snapshots."""
+        self.handle_export()
 
     def print_help(self):
         print("""
@@ -455,6 +666,10 @@ class AxisRunner:
 /status            - Check current profile completeness and state
 /veto              - Run Risk Veto check (checks Adversarial Review v3.0)
 /audit             - Run Survival Audit (checks payback period & city priorities)
+/save [title]      - Save current profile state to a snapshot
+/restore [arg]     - Restore profile state from snapshot (by index or title)
+/list              - List all snapshots and candidate sessions
+/report            - Compile snapshots and generate final cumulative report
 /export            - Compile and export the final '1+X' action plan
 /help              - Show this help menu
 /exit              - Exit the application
@@ -499,6 +714,18 @@ class AxisRunner:
                     self.handle_veto()
                 elif cmd_line == "/audit":
                     self.handle_audit()
+                elif cmd_line.startswith("/save"):
+                    parts = cmd_line.split(' ', 1)
+                    title = parts[1].strip() if len(parts) >= 2 else "counseling milestone"
+                    self.handle_save(title)
+                elif cmd_line.startswith("/restore"):
+                    parts = cmd_line.split(' ', 1)
+                    arg = parts[1].strip() if len(parts) >= 2 else ""
+                    self.handle_restore(arg)
+                elif cmd_line == "/list":
+                    self.handle_list()
+                elif cmd_line == "/report":
+                    self.handle_report()
                 elif cmd_line == "/export":
                     self.handle_export()
                 elif cmd_line == "/help":
