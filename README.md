@@ -29,29 +29,47 @@
 
 ## 🔧 安装方法 (Installation)
 
-由于本项目已包含 `.claude-plugin/marketplace.json` 元数据配置并对子技能目录进行了 `skills/` 重构，支持以下一键安装方式：
+⚠️ **重要提示**：本技能不支持全局安装（`-g` 参数）。请使用以下方法之一：
 
-### 1. Claude Code 插件式安装
-
-在支持 `claude` 终端命令的客户端下，直接运行以下命令：
+### 1. 本地直接运行（最简单，推荐）
 
 ```bash
-# 从 GitHub 仓库直接作为插件添加（请将 ares0x/axis-skill 替换为你的实际仓库路径）
-claude plugin marketplace add ares0x/axis-skill
-
-# 或直接安装特定注册的技能名
-claude plugin install axis@axis-skills
-```
-
-### 2. 本地集成（推荐开发者使用）
-
-直接克隆本项目到你的开发工作区：
-
-```bash
+# 克隆项目
 git clone https://github.com/ares0x/axis-skill.git
+cd axis-skill
+
+# 直接运行
+python3 runner.py
 ```
 
-克隆后在此目录下启动 `claude` 命令行，Claude Code 会通过根目录的 `CLAUDE.md` 与 `SKILL.md` 自动无缝识别并挂载本 Skill 决策引擎。
+### 2. 在项目目录中安装（使用 skills 命令）
+
+```bash
+# 进入你的项目目录
+cd /path/to/your/project
+
+# 安装到当前项目（不要使用 -g）
+npx -y skills add ares0x/axis-skill
+```
+
+### 3. Claude Code 插件式使用
+
+在支持 `claude` 终端命令的客户端下，在项目目录中：
+
+```bash
+# 进入项目目录
+cd /path/to/your/project
+
+# 在当前目录启动 claude，会自动识别项目中的技能
+claude
+```
+
+克隆后在此目录下启动 `claude` 命令行，Claude Code 会通过根目录的 `CLAUDE.md` 与 `skills/` 目录自动识别并挂载本 Skill 决策引擎。
+
+### 💡 常见问题
+
+**Q: 安装时提示 "PromptScript does not support global skill installation"?**
+A: 这是正常的，本技能不支持 `-g` 全局安装。请使用上述方法 1 或 2。
 
 ---
 
