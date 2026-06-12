@@ -1,5 +1,6 @@
 import os
 import json
+from datetime import datetime
 from scripts.evaluator import MajorEvaluator, SanageAxisEvaluator
 from scripts.gaokao_mapper import normalize_province
 
@@ -404,9 +405,9 @@ class OutputGenerator:
 
 ## 📅 数据来源与时效声明 (Data Sources & Validity)
 
-- **高考批次省控制线**: [{authority_name}]({authority_url}) / 在线公开高考数据库 · 采集年份：2024-2025 · 采集于 2026-06-11
-- **一分一段位次表**: [{authority_name}]({authority_url}) / 在线公开一分一段数据库 · 采集年份：2024-2025 · 采集于 2026-06-11
-- **战略新增专业与撤销专业名单**: 中华人民共和国教育部官方公开数据 · 采集年份：2026 · 采集于 2026-03
+- **高考批次省控制线**: [{authority_name}]({authority_url}) / 在线公开高考数据库 · 采集年份：2024-2025 · 采集于 {datetime.now().strftime('%Y-%m-%d')}
+- **一分一段位次表**: [{authority_name}]({authority_url}) / 在线公开一分一段数据库 · 采集年份：2024-2025 · 采集于 {datetime.now().strftime('%Y-%m-%d')}
+- **战略新增专业与撤销专业名单**: 中华人民共和国教育部官方公开数据 · 采集年份：2026 · 采集于 {datetime.now().strftime('%Y-%m')}
 
 ---
 

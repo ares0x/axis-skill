@@ -2,6 +2,14 @@ import os
 import json
 import sys
 from datetime import datetime
+
+# Ensure project root is on sys.path so "from scripts.X import ..." works
+# whether runner.py is invoked directly (python3 scripts/runner.py) or
+# imported from tests (python3 -m unittest tests.test_skills).
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 from scripts.injector import KnowledgeInjector
 from scripts.evaluator import MajorEvaluator, SanageAxisEvaluator
 from scripts.trait_evaluator import TraitEvaluator
@@ -9,7 +17,7 @@ from scripts.output_generator import OutputGenerator, parse_markdown_with_frontm
 
 class AxisRunner:
     def __init__(self):
-        self.workspace_dir = os.path.join(os.path.dirname(__file__), 'workspace')
+        self.workspace_dir = os.path.join(_project_root, 'workspace')
         self.sessions_dir = os.path.join(self.workspace_dir, 'sessions')
         self.template_dir = os.path.join(self.workspace_dir, 'template')
         
@@ -262,6 +270,36 @@ class AxisRunner:
                 print(f"   MBTI Type: {mbti_ans} (⚠️ 格式非标准4字母)")
         print("==============================================================\n")
         
+        step = self.get_profile_step(self.current_facts)
+        print(f"[Current State: Profile Step {step}/3]")
+
+    def _run_explore_noninteractive(self, q1_ans, q2_ans, driver_choice=None):
+        """Run the 2-question talent assessment in non-interactive mode."""
+        if not self.current_uid:
+            print("❌ Please initialize a student session first with `/init [uid]`.")
+            return
+
+        results = self.trait_evaluator.evaluate_traits(q1_ans, q2_ans)
+        if driver_choice:
+            if driver_choice == 'A':
+                results["core_driver"] = "壁垒优先"
+            elif driver_choice == 'B':
+                results["core_driver"] = "高风险高回报"
+            elif driver_choice == 'C':
+                results["core_driver"] = "环境优先"
+
+        profile = self.current_facts["psychological_profile"]
+        profile["holland_code_inferred"] = results["holland_code_inferred"]
+        profile["core_driver"] = results["core_driver"]
+        profile["derived_strengths"] = results["derived_strengths"]
+        self.save_facts(self.current_uid, self.current_facts)
+
+        self.log_timeline(self.current_uid,
+            f"Non-interactive explore: Holland={results['holland_code_inferred']}, Driver={results['core_driver']}")
+
+        print(f"✅ Holland Codes: {results['holland_code_inferred']}")
+        print(f"   Core Driver: {results['core_driver']}")
+        print(f"   Strengths: {results['derived_strengths']}")
         step = self.get_profile_step(self.current_facts)
         print(f"[Current State: Profile Step {step}/3]")
 
@@ -800,7 +838,7 @@ class AxisRunner:
 
     def print_help(self):
         print("""
-🌟 sanage Axis v3.0 - Command Menu 🌟
+🌟 sanage Axis v3.1 - Command Menu 🌟
 --------------------------------------
 /init [uid]        - Start or load session for a candidate
 /set [key] [val]   - Set profile value. Keys:
@@ -809,7 +847,10 @@ class AxisRunner:
                       * score (文化分, e.g. 520)
                       * art_rank (艺术省排, e.g. 1200)
                       * subjects (选科, e.g. 物理,化学,生物)
-/explore           - Run the Holland & Gallup Talent Exploration Test
+/explore           - Run the Holland & Gallup Talent Exploration Test (interactive)
+/explore q1 q2     - Non-interactive 2Q explore with pre-collected answers
+/holland_eval      - Score the full 8-question Holland quiz (non-interactive)
+                      Usage: /holland_eval q1 q2 q3 q4 q5 q6 q7 [q8_text] [--driver A|B|C]
 /add_major [major] - Add major to candidate's target selection list
 /status            - Check current profile completeness and state
 /veto              - Run Risk Veto check (checks Adversarial Review v3.0)
@@ -821,6 +862,10 @@ class AxisRunner:
 /export            - Compile and export the final '1+X' action plan
 /help              - Show this help menu
 /exit              - Exit the application
+
+💡 Multi-command mode (for AI agent invocation):
+  python3 runner.py "/init uid" "/set province 广东" "/set score 580" "/veto"
+  All commands share the same session instance, preserving state across calls.
 """)
 
     def execute_command(self, cmd_line, interactive=True):
@@ -847,11 +892,69 @@ class AxisRunner:
                 print("❌ Usage: /add_major [major_name]")
                 return
             self.handle_add_major(parts[1].strip())
+        elif cmd_line.startswith("/holland_eval"):
+            parts = cmd_line.split(' ', 1)
+            if len(parts) < 2:
+                print("❌ Usage: /holland_eval q1 q2 q3 q4 q5 q6 q7 [q8_open_text] [--driver A|B|C]")
+                print("   q1-q7: A or B (answers to the 8-question Holland quiz)")
+                print("   q8_open_text: optional free-text interest description")
+                print("   --driver: optional core driver (A=壁垒优先, B=高风险高回报, C=环境优先)")
+                return
+            args_parts = parts[1].strip().split()
+            if len(args_parts) < 7:
+                print("❌ At least 7 answers (q1-q7) are required.")
+                return
+            q1, q2, q3, q4, q5, q6, q7 = args_parts[:7]
+            driver_choice = None
+            q8_open = ""
+            remaining = args_parts[7:]
+            if "--driver" in remaining:
+                di = remaining.index("--driver")
+                if di + 1 < len(remaining):
+                    driver_choice = remaining[di + 1].upper()
+                    q8_parts = remaining[:di]
+                else:
+                    q8_parts = remaining[:di]
+            else:
+                q8_parts = remaining
+            q8_open = " ".join(q8_parts) if q8_parts else ""
+            results = self.trait_evaluator.evaluate_8q(q1, q2, q3, q4, q5, q6, q7, q8_open, driver_choice)
+            if self.current_uid:
+                profile = self.current_facts["psychological_profile"]
+                profile["holland_code_inferred"] = results["holland_code_inferred"]
+                if results["core_driver"] != "普通期望":
+                    profile["core_driver"] = results["core_driver"]
+                profile["derived_strengths"] = results["derived_strengths"]
+                self.save_facts(self.current_uid, self.current_facts)
+                self.log_timeline(self.current_uid, f"Holland 8Q scored: {results['holland_code_inferred']}, Driver: {results['core_driver']}")
+            print(f"✅ Holland Codes: {results['holland_code_inferred']}")
+            print(f"   Core Driver: {results['core_driver']}")
+            print(f"   Strengths: {results['derived_strengths']}")
+            if self.current_uid:
+                step = self.get_profile_step(self.current_facts)
+                print(f"[Current State: Profile Step {step}/3]")
         elif cmd_line == "/explore":
             if not interactive:
-                print("❌ Cannot run talent assessment quiz non-interactively.")
+                print("❌ Cannot run interactive talent assessment in non-interactive mode.")
+                print("   Use /holland_eval instead: /holland_eval q1 q2 q3 q4 q5 q6 q7 [q8_text] [--driver A|B|C]")
                 return
             self.handle_explore()
+        elif cmd_line.startswith("/explore"):
+            # Non-interactive explore with pre-collected answers: /explore q1 q2 [--driver A|B|C]
+            parts = cmd_line.split()
+            if len(parts) >= 3 and not interactive:
+                q1_ans, q2_ans = parts[1].upper(), parts[2].upper()
+                driver_choice = None
+                if "--driver" in parts:
+                    di = parts.index("--driver")
+                    if di + 1 < len(parts):
+                        driver_choice = parts[di + 1].upper()
+                self._run_explore_noninteractive(q1_ans, q2_ans, driver_choice)
+            elif not interactive:
+                print("❌ Usage: /explore q1 q2 [--driver A|B|C]")
+                return
+            else:
+                self.handle_explore()
         elif cmd_line == "/status":
             self.print_status()
         elif cmd_line == "/veto":
@@ -915,7 +1018,7 @@ if __name__ == '__main__':
             profile["core_driver"] = results["core_driver"]
             profile["derived_strengths"] = results["derived_strengths"]
             runner.save_facts(runner.current_uid, runner.current_facts)
-            
+
             runner.handle_add_major('智能控制技术')
             runner.handle_add_major('大数据与会计')
             runner.handle_veto()
@@ -937,19 +1040,34 @@ if __name__ == '__main__':
             profile2["core_driver"] = results2["core_driver"]
             profile2["derived_strengths"] = results2["derived_strengths"]
             runner.save_facts(runner.current_uid, runner.current_facts)
-            
+
             runner.handle_add_major('数字媒体艺术')
             runner.handle_add_major('视觉传达设计')
             runner.handle_veto()
             runner.handle_audit()
             runner.handle_export()
-        elif sys.argv[1].startswith('/'):
-            # Single-shot command execution
-            cmd_line = ' '.join(sys.argv[1:])
-            runner.execute_command(cmd_line, interactive=False)
+        elif any(arg.startswith('/') for arg in sys.argv[1:]):
+            # Slash command mode: execute one or more commands sharing the same AxisRunner instance.
+            # This is the correct way for AI agents to chain commands with session state.
+            # Usage: python3 runner.py "/init uid" "/set province 广东" "/set score 580"
+            #   or:  python3 runner.py /init uid /set province 广东 /set score 580
+            commands = []
+            current_cmd_parts = []
+            for arg in sys.argv[1:]:
+                if arg.startswith('/') and current_cmd_parts:
+                    commands.append(' '.join(current_cmd_parts))
+                    current_cmd_parts = [arg]
+                else:
+                    current_cmd_parts.append(arg)
+            if current_cmd_parts:
+                commands.append(' '.join(current_cmd_parts))
+
+            for cmd in commands:
+                runner.execute_command(cmd, interactive=False)
         else:
             print("❌ Invalid argument. Usage:")
-            print("  python3 runner.py            (runs interactive shell)")
-            print("  python3 runner.py /init [id] (runs a single command)")
+            print("  python3 runner.py                              (interactive shell)")
+            print('  python3 runner.py "/init uid" "/set k v" ...   (multi-command, keeps state)')
+            print("  python3 runner.py /init uid                    (single command)")
     else:
         runner.start_loop()

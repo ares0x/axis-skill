@@ -1,8 +1,3 @@
----
-name: report
-description: 高考志愿最终生存报告输出。生成结构化 1+X 方案报告，支持用户追问。
----
-
 # Report — 输出报告协议
 
 当 `/analyze` 推理分析阶段完成，调用此 subskill 生成最终的 Markdown 报告。

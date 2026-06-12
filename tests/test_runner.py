@@ -19,7 +19,7 @@ print("=" * 80)
 print("\n📋 测试 1: AxisRunner 初始化")
 print("-" * 80)
 try:
-    from runner import AxisRunner
+    from scripts.runner import AxisRunner
     runner = AxisRunner()
     print("✅ AxisRunner 初始化成功")
 except Exception as e:
@@ -176,11 +176,11 @@ except Exception as e:
 print("\n📋 测试 11: API 降级机制")
 print("-" * 80)
 try:
-    from scripts.fallback_data import get_provincial_line_fallback, estimate_rank_from_score
+    from scripts.fallback_data import get_fallback_province_control_lines, estimate_rank_from_score
     # 测试本地 fallback 数据
-    line = get_provincial_line_fallback("广东", "夏季高考", "本科批")
-    if line:
-        print(f"✅ 广东 2025 本科批省控线 (Fallback): {line}")
+    lines = get_fallback_province_control_lines("广东", "2025")
+    if lines:
+        print(f"✅ 广东 2025 省控线 (Fallback): {len(lines)} 条记录")
     else:
         print("⚠️  本地 fallback 数据未找到，但机制正常")
 except Exception as e:
