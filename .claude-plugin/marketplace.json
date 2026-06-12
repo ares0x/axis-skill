@@ -16,7 +16,7 @@
       "version": "1.0.0",
       "category": "education",
       "keywords": ["gaokao", "counseling", "university", "major", "chinese"],
-      "skills": ["./skills/axis"]
+      "skills": ["./"]
     },
     {
       "name": "profile",
