@@ -7,6 +7,7 @@ from scripts.sogou_api import fetch_score_range
 
 class MajorEvaluator:
     def __init__(self, data_dir=None):
+        self.data_dir = data_dir
         self.injector = KnowledgeInjector(data_dir=data_dir)
         self._build_five_year_keywords()
 
@@ -18,113 +19,109 @@ class MajorEvaluator:
         keywords += re.findall(r'[-*]\s+(.{2,12})[（(「\n]', text)
         self.five_year_keywords = list(set(k.strip() for k in keywords if len(k) > 1))
 
-        # Hardcoded dictionary for AI replacement rates (0.0 means immune, 1.0 means fully replaceable)
-        self.ai_replacement_rates = {
-            "translation": 0.95,
-            "翻译": 0.95,
-            "english": 0.90,
-            "英语": 0.90,
-            "accounting": 0.85,
-            "会计": 0.85,
-            "business administration": 0.80,
-            "工商管理": 0.80,
-            "public administration": 0.85,
-            "公共事业管理": 0.85,
-            "social work": 0.65,
-            "社会工作": 0.65,
-            "journalism": 0.85,
-            "新闻学": 0.85,
-            "finance": 0.70,
-            "金融": 0.70,
-            "law": 0.60,
-            "法律": 0.60,
-            "法学": 0.60,
-            "graphic design": 0.75,
-            "平面设计": 0.75,
-            "civil engineering": 0.40,
-            "土木": 0.40,
-            "computer science": 0.55,
-            "计算机": 0.55,
-            "software engineering": 0.50,
-            "软件工程": 0.50,
-            "artificial intelligence": 0.20,
-            "人工智能": 0.20,
-            "integrated circuit": 0.15,
-            "集成电路": 0.15,
-            "semiconductor": 0.15,
-            "半导体": 0.15,
-            "electrical engineering": 0.15,
-            "电气": 0.15,
-            "smart grid": 0.15,
-            "电网": 0.15,
-            "smart manufacturing": 0.25,
-            "智能制造": 0.25,
-            "clinical medicine": 0.08,
-            "临床医学": 0.08,
-            "dentist": 0.05,
-            "dentistry": 0.05,
-            "口腔": 0.05,
-            "nursing": 0.10,
-            "护理": 0.10,
-            "special education": 0.15,
-            "特殊教育": 0.15,
-            "数字媒体艺术": 0.80,
-            "工业设计": 0.45,
-            "智能控制技术": 0.25,
-            "新能源汽车检测与维修": 0.15
+        # Initialize dictionaries
+        self.ai_replacement_rates = {}
+        self.employment_stability = {}
+        self.major_aliases = {}
+
+        # 1. Fallback default configurations
+        fallback_ai = {
+            "translation": 0.95, "翻译": 0.95, "english": 0.90, "英语": 0.90,
+            "accounting": 0.85, "会计": 0.85, "business administration": 0.80, "工商管理": 0.80,
+            "public administration": 0.85, "公共事业管理": 0.85, "social work": 0.65, "社会工作": 0.65,
+            "journalism": 0.85, "新闻学": 0.85, "finance": 0.70, "金融": 0.70,
+            "law": 0.60, "法律": 0.60, "法学": 0.60, "graphic design": 0.75, "平面设计": 0.75,
+            "civil engineering": 0.40, "土木": 0.40, "computer science": 0.55, "计算机": 0.55,
+            "software engineering": 0.50, "软件工程": 0.50, "artificial intelligence": 0.20, "人工智能": 0.20,
+            "integrated circuit": 0.15, "集成电路": 0.15, "semiconductor": 0.15, "半导体": 0.15,
+            "electrical engineering": 0.15, "电气": 0.15, "smart grid": 0.15, "电网": 0.15,
+            "smart manufacturing": 0.25, "智能制造": 0.25, "clinical medicine": 0.08, "临床医学": 0.08,
+            "dentist": 0.05, "dentistry": 0.05, "口腔": 0.05, "nursing": 0.10, "护理": 0.10,
+            "special education": 0.15, "特殊教育": 0.15, "数字媒体艺术": 0.80, "工业设计": 0.45,
+            "智能控制技术": 0.25, "新能源汽车检测与维修": 0.15
+        }
+        fallback_stability = {
+            "electrical engineering": 0.95, "电气": 0.95, "smart grid": 0.95, "电网": 0.95,
+            "clinical medicine": 0.90, "临床医学": 0.90, "dentist": 0.95, "dentistry": 0.95,
+            "口腔": 0.95, "nursing": 0.85, "护理": 0.85, "special education": 0.80, "特殊教育": 0.80,
+            "integrated circuit": 0.85, "集成电路": 0.85, "semiconductor": 0.85, "半导体": 0.85,
+            "artificial intelligence": 0.75, "人工智能": 0.75, "software engineering": 0.70, "软件工程": 0.70,
+            "computer science": 0.65, "计算机": 0.65, "smart manufacturing": 0.80, "智能制造": 0.80,
+            "civil engineering": 0.30, "土木": 0.30, "business administration": 0.20, "工商管理": 0.20,
+            "english": 0.20, "英语": 0.20, "translation": 0.15, "翻译": 0.15,
+            "public administration": 0.20, "公共事业管理": 0.20, "social work": 0.30, "社会工作": 0.30,
+            "journalism": 0.20, "新闻学": 0.20, "finance": 0.40, "金融": 0.40,
+            "law": 0.50, "法律": 0.50, "法学": 0.50, "数字媒体艺术": 0.65, "工业设计": 0.75,
+            "智能控制技术": 0.85, "新能源汽车检测与维修": 0.90
         }
 
-        # Hardcoded stability rating (0.0 to 1.0)
-        self.employment_stability = {
-            "electrical engineering": 0.95,
-            "电气": 0.95,
-            "smart grid": 0.95,
-            "电网": 0.95,
-            "clinical medicine": 0.90,
-            "临床医学": 0.90,
-            "dentist": 0.95,
-            "dentistry": 0.95,
-            "口腔": 0.95,
-            "nursing": 0.85,
-            "护理": 0.85,
-            "special education": 0.80,
-            "特殊教育": 0.80,
-            "integrated circuit": 0.85,
-            "集成电路": 0.85,
-            "semiconductor": 0.85,
-            "半导体": 0.85,
-            "artificial intelligence": 0.75,
-            "人工智能": 0.75,
-            "software engineering": 0.70,
-            "软件工程": 0.70,
-            "computer science": 0.65,
-            "计算机": 0.65,
-            "smart manufacturing": 0.80,
-            "智能制造": 0.80,
-            "civil engineering": 0.30,
-            "土木": 0.30,
-            "business administration": 0.20,
-            "工商管理": 0.20,
-            "english": 0.20,
-            "英语": 0.20,
-            "translation": 0.15,
-            "翻译": 0.15,
-            "public administration": 0.20,
-            "公共事业管理": 0.20,
-            "social work": 0.30,
-            "社会工作": 0.30,
-            "journalism": 0.20,
-            "新闻学": 0.20,
-            "finance": 0.40,
-            "金融": 0.40,
-            "law": 0.50,
-            "法律": 0.50,
-            "法学": 0.50,
-            "数字媒体艺术": 0.65,
-            "工业设计": 0.75,
-            "智能控制技术": 0.85,
-            "新能源汽车检测与维修": 0.90
+        # 1.1 Fallback major aliases
+        fallback_aliases = {
+            "计科": "计算机科学与技术",
+            "计算机科学": "计算机科学与技术",
+            "cs": "计算机科学与技术",
+            "软工": "软件工程",
+            "se": "软件工程",
+            "ai": "人工智能",
+            "人工智能技术": "人工智能",
+            "智能科学与技术": "人工智能"
         }
+        
+        # 2. Attempt loading from configuration file
+        if self.data_dir:
+            config_path = os.path.join(self.data_dir, "major_rules.json")
+        else:
+            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            config_path = os.path.join(base_path, "data", "major_rules.json")
+        loaded_successfully = False
+        
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                    
+                ai_rates = config.get("ai_replacement_rates")
+                stability = config.get("employment_stability")
+                aliases = config.get("major_aliases")
+                
+                if isinstance(ai_rates, dict) and isinstance(stability, dict):
+                    valid_ai = all(isinstance(v, (int, float)) and 0 <= v <= 1 for v in ai_rates.values())
+                    valid_stab = all(isinstance(v, (int, float)) and 0 <= v <= 1 for v in stability.values())
+                    valid_aliases = isinstance(aliases, dict) and all(isinstance(k, str) and isinstance(v, str) for k, v in aliases.items())
+                    
+                    if valid_ai and valid_stab:
+                        self.ai_replacement_rates = ai_rates
+                        self.employment_stability = stability
+                        if valid_aliases:
+                            self.major_aliases = aliases
+                        else:
+                            self.major_aliases = fallback_aliases
+                        loaded_successfully = True
+            except Exception:
+                pass
+                
+        if not loaded_successfully:
+            self.ai_replacement_rates = fallback_ai
+            self.employment_stability = fallback_stability
+            self.major_aliases = fallback_aliases
+
+    def normalize_major(self, major_name):
+        """标准化专业名称：将别名转换为标准名称"""
+        if not major_name:
+            return major_name
+        
+        # 检查是否有精确匹配的别名
+        major_name_clean = major_name.strip()
+        if major_name_clean in self.major_aliases:
+            return self.major_aliases[major_name_clean]
+        
+        # 检查是否有包含关系的别名（不区分大小写）
+        major_lower = major_name_clean.lower()
+        for alias, standard in self.major_aliases.items():
+            if alias.lower() in major_lower or major_lower in alias.lower():
+                return standard
+        
+        return major_name
 
     def get_ai_replacement_rate(self, major_name):
         major_lower = major_name.lower()
@@ -350,7 +347,7 @@ class MajorEvaluator:
             financial_expectation = student_facts.get("Financial Expectation", "") or student_facts["psychological_profile"].get("core_driver", "")
         else:
             family_support = student_facts.get("Family Background Support", "")
-            financial_expectation = student_facts.get("Financial Expectation", "")
+        financial_expectation = student_facts.get("Financial Expectation", "")
 
         subjects_str = "".join([s.strip() for s in subjects.replace("，", ",").split(",")])
 
@@ -365,14 +362,54 @@ class MajorEvaluator:
                 veto_reasons.append("未选【物理+化学】科目，该理工医学类专业不符合夏季高考报考资格。")
 
         # B. Check Family Resource fit
-        is_low_income = "低" in family_support or "困难" in family_support or "即就业" in family_support or "立即就业" in family_support or "壁垒优先" in family_support or "壁垒优先" in financial_expectation
+        is_low_income = (
+            "低" in family_support or "困难" in family_support or 
+            "即就业" in family_support or "立即就业" in family_support or 
+            "变现" in family_support or "变现" in financial_expectation or
+            "变现" in str(student_facts) or "尽快有稳定收入" in str(student_facts) or
+            "壁垒优先" in family_support or "壁垒优先" in financial_expectation
+        )
 
-        # Clinical medicine needs long duration
-        if "clinical medicine" in major_lower or "临床医学" in major_name:
+        # Medicine needs long duration check (VETO under low income / quick变现)
+        if any(x in major_lower or x in major_name for x in ["clinical medicine", "临床医学", "口腔", "dentist", "dentistry"]):
             if is_low_income:
-                match_reasons.append("临床医学学制长（通常需要5年本科+3年规培/硕士），对于需要毕业即就业的家庭经济压力极大，请谨慎。")
+                is_vetoed = True
+                veto_reasons.append(f"该医学专业（{major_name}）学制长（通常为5年本科+3年规培），独立行医周期长达8年，严重违背您毕业后尽快有稳定收入的核心诉求。")
             else:
-                match_reasons.append("家庭资源支持长周期，临床医学是高壁垒抗AI的黄金学科。")
+                match_reasons.append("家庭资源支持长周期，该医学专业是高壁垒抗AI的黄金学科。")
+
+        # Pure science check (VETO under low income / quick变现)
+        is_pure_science = any(kw in major_name for kw in ["数学与应用数学", "物理学", "化学", "生物科学", "生物技术", "地理科学", "基础理学", "基础科学"]) and not any(kw in major_name for kw in ["工业设计", "数字媒体"])
+        if is_pure_science and is_low_income:
+            is_vetoed = True
+            veto_reasons.append(f"该纯基础理科专业（{major_name}）变现转化链路极长，试错成本高，不符合快速稳定就业的期望。")
+
+        # Physical constraints check (Color blindness / weakness)
+        restriction = student_facts.get("basic_info", {}).get("body_restriction", "无") if "basic_info" in student_facts else student_facts.get("body_restriction", "无")
+        if any(r in restriction for r in ["色盲", "色弱"]):
+            color_sensitive_majors = ["电气", "电网", "电力", "化学", "化工", "医学", "临床", "口腔", "护理", "药学", "生物", "农学", "电子信息"]
+            if any(m in major_name for m in color_sensitive_majors):
+                is_vetoed = True
+                veto_reasons.append(f"考生体检情况为【{restriction}】，受高校招生体检规定限制，色盲/色弱考生禁止报考【{major_name}】相关专业。")
+
+        # D. Check Dislikes (排斥/规避专业)
+        dislikes = []
+        if "basic_info" in student_facts:
+            dislikes = student_facts["basic_info"].get("dislikes", [])
+        else:
+            dislikes = student_facts.get("dislikes", [])
+
+        if dislikes:
+            for item in dislikes:
+                mapped_keywords = [item]
+                if item == "生化环材":
+                    mapped_keywords = ["生物", "化学", "环境", "材料"]
+                
+                for kw in mapped_keywords:
+                    if kw in major_name:
+                        is_vetoed = True
+                        veto_reasons.append(f"该专业（{major_name}）匹配了您意向规避/排斥的专业关键词【{item}】。")
+                        break
 
         # Public system targets (Electrical Grid / Police / Military)
         if any(x in major_lower or x in major_name for x in ["电气", "电网", "electrical", "grid"]):
@@ -423,6 +460,49 @@ class MajorEvaluator:
             "is_vetoed": is_vetoed,
             "veto_reasons": veto_reasons,
             "match_reasons": match_reasons
+        }
+
+    def get_recommendations_by_rank(self, province, student_rank, subjects_str=""):
+        """
+        Group benchmark schools from database into 冲, 稳, 保 based on student rank.
+        """
+        stretch = []
+        target = []
+        safe = []
+        anchor = []
+        
+        try:
+            r_val = int(student_rank)
+        except (ValueError, TypeError):
+            return {"冲": [], "稳": [], "保": [], "垫": []}
+            
+        for row in self.injector.score_lines:
+            if row.get("province") == province:
+                try:
+                    min_r = int(row.get("min_rank", 0))
+                except (ValueError, TypeError):
+                    continue
+                if min_r <= 0:
+                    continue
+                    
+                school = row.get("school_name", "")
+                major = row.get("major", "")
+                item_str = f"{school}（{major}，2024最低排位约{min_r}）"
+                
+                if int(r_val * 0.5) <= min_r < int(r_val * 0.95):
+                    stretch.append(item_str)
+                elif int(r_val * 0.95) <= min_r < int(r_val * 1.25):
+                    target.append(item_str)
+                elif int(r_val * 1.25) <= min_r < int(r_val * 1.45):
+                    safe.append(item_str)
+                elif min_r >= int(r_val * 1.45):
+                    anchor.append(item_str)
+                    
+        return {
+            "冲": list(set(stretch))[:3],
+            "稳": list(set(target))[:3],
+            "保": list(set(safe))[:3],
+            "垫": list(set(anchor))[:3]
         }
 
 
@@ -485,7 +565,7 @@ class SanageAxisEvaluator:
                     "reason": "迎合大湾区智能新能源实体产业红利，偏重物理落地技能"
                 }
             ])
-        elif "艺术类" in track_type or "艺考" in track_type:
+        elif "艺术类" in track_type or "艺术" in track_type or "艺考" in track_type:
             # 艺考走 1+X 复合或考公洗白路径
             recommendation_pool.extend([
                 {
@@ -529,6 +609,97 @@ class SanageAxisEvaluator:
                     "strategy_tag": "SURVIVAL_FIRST",
                     "reason": "考公大户，自带行业窄门与行政壁垒，AI无法闭环复杂的法庭辩论与人际博弈"
                 })
+
+            # Map RCA (or A alongside R/C) to Industrial Design & Digital Media Technology
+            if "A" in traits and ("R" in traits or "C" in traits):
+                recommendation_pool.append({
+                    "major": "工业设计",
+                    "score": 93,
+                    "path": "工科背景 + 产品美学与创意设计",
+                    "strategy_tag": "COMPOSITE_X",
+                    "reason": "完美结合 R/C 的工科物理世界壁垒与 A 的创意美学，AI难以完全替代这种复合型设计。"
+                })
+                recommendation_pool.append({
+                    "major": "数字媒体技术",
+                    "score": 90,
+                    "path": "计算机技术 + 艺术交互开发",
+                    "strategy_tag": "COMPOSITE_X",
+                    "reason": "代码开发底座（R/C）与交互美学设计（A）的结合，避开纯程序员的低端替代，对接新质生产力数字创意岗位。"
+                })
+
+        # Check special paths willingness and quick stable income driver
+        willing_special = False
+        if "basic_info" in self.user_data:
+            willing_special = self.user_data["basic_info"].get("willing_special") in ["是", "y", "yes", "true", True, "willing"]
+        else:
+            willing_special = self.user_data.get("willing_special") in ["是", "y", "yes", "true", True, "willing"]
+
+        is_quick_income = (
+            "变现" in driver or "即就业" in driver or "尽快" in driver or "壁垒" in driver or
+            "尽快有稳定收入" in str(self.user_data) or "尽快变现" in str(self.user_data)
+        )
+
+        if willing_special and is_quick_income:
+            recommendation_pool.append({
+                "major": "公费定向师范生 (提前批)",
+                "score": 98,
+                "path": "本科免学费 -> 毕业直通生源地中小学教师编制",
+                "strategy_tag": "SPECIAL_PATH",
+                "reason": "四年学费全免，毕业直接解决地方事业编制，满足快速稳定变现的终极诉求。"
+            })
+            recommendation_pool.append({
+                "major": "提前批公安警校",
+                "score": 97,
+                "path": "本科警校 -> 参加公安联考直通入警带编",
+                "strategy_tag": "SPECIAL_PATH",
+                "reason": "毕业参加公安联考入警率超90%，4年毕业直接入警带公务员编制，铁饭碗保障。"
+            })
+            recommendation_pool.append({
+                "major": "农村卫生定向 (临床/中医)",
+                "score": 96,
+                "path": "免费医学教育 -> 毕业直通基层卫生院带编岗位",
+                "strategy_tag": "SPECIAL_PATH",
+                "reason": "避开普通医学长达8年的变现泥潭，免费学医，毕业即有地方卫生院事业编工作。"
+            })
+
+        # Check priority preferences (三维平衡取舍)
+        priority_choice = "未定"
+        if "basic_info" in self.user_data:
+            priority_choice = self.user_data["basic_info"].get("priority_choice", "未定")
+        else:
+            priority_choice = self.user_data.get("priority_choice", "未定")
+
+        if priority_choice == "学校优先":
+            recommendation_pool.append({
+                "major": "大类招生 (如工科/理科试验班)",
+                "score": 92,
+                "path": "大一通用培养 -> 大二再分流确定专业",
+                "strategy_tag": "SCHOOL_FIRST",
+                "reason": "【学校优先】策略下的最佳通道：优先提升学校名气与层级，用大一的一年时间作为‘专业体验卡’，大二再分流分科。"
+            })
+            recommendation_pool.append({
+                "major": "数学与应用数学 (宽口径)",
+                "score": 89,
+                "path": "名校基础理科 -> 硕士高保研或跨考金牌专业",
+                "strategy_tag": "SCHOOL_FIRST",
+                "reason": "【学校优先】策略的备选路径：利用基础学科的高保研率 and 名校光环，在硕士阶段轻松跨考实现专业二次定位。"
+            })
+        elif priority_choice == "城市优先":
+            recommendation_pool.append({
+                "major": "计算机类/电子信息类 (城市产业对齐)",
+                "score": 92,
+                "path": "发达城市双非高校 -> 深度融入本地高新技术产业链",
+                "strategy_tag": "CITY_FIRST",
+                "reason": "【城市优先】策略的打法：虽然学校层级适当让步，但留在核心城市能获得更好的本地实习、社会资源与高频校招机会。"
+            })
+        elif priority_choice == "专业优先":
+            recommendation_pool.append({
+                "major": "电气工程及其自动化 (强壁垒应用)",
+                "score": 92,
+                "path": "专业强校 -> 稳步直通电网/工业巨头",
+                "strategy_tag": "MAJOR_FIRST",
+                "reason": "【专业优先】策略的铁律：放弃部分名校层级，下沉到行业特色大学（如双非强电高校），确保守住国家电网等高垄断就业窄门。"
+            })
 
         # 2. 功利主义权重修正 (根据家庭资源审计)
         if driver == "壁垒优先":

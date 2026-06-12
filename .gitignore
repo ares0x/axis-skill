@@ -46,3 +46,6 @@ __pycache__/
 # Local Student Sessions (keep example_session template)
 workspace/sessions/*
 !workspace/sessions/example_session/
+
+# Sogou API Cache
+.cache/

@@ -135,14 +135,26 @@ class OutputGenerator:
             uid = student_facts["basic_info"].get("uid", "unknown")
             province = student_facts["basic_info"].get("province", "未知")
             track_type = student_facts["basic_info"].get("track_type", "夏季高考")
-            score = student_facts["basic_info"].get("score_details", {}).get("culture_score") or student_facts["basic_info"].get("score_details", {}).get("art_province_ranking") or "未知"
+            score = student_facts["basic_info"].get("score_details", {}).get("culture_score") or "未知"
+            rank = student_facts["basic_info"].get("score_details", {}).get("rank") or "未知"
+            art_province_ranking = student_facts["basic_info"].get("score_details", {}).get("art_province_ranking") or "未知"
             subjects = student_facts["basic_info"].get("subjects", "未知")
+            body_restriction = student_facts["basic_info"].get("body_restriction", "无")
+            willing_special = student_facts["basic_info"].get("willing_special", "否")
+            priority_choice = student_facts["basic_info"].get("priority_choice", "未定")
+            dislikes = student_facts["basic_info"].get("dislikes", [])
         else:
             uid = student_facts.get("UID", "unknown")
             province = student_facts.get("Province", "未知")
             track_type = student_facts.get("track_type") or student_facts.get("Track Type", "夏季高考")
             score = student_facts.get("Score / Ranking", "未知")
+            rank = student_facts.get("rank") or "未知"
+            art_province_ranking = student_facts.get("art_province_ranking") or "未知"
             subjects = student_facts.get("Subject Combination", "未知")
+            body_restriction = student_facts.get("body_restriction", "无")
+            willing_special = student_facts.get("willing_special", "否")
+            priority_choice = student_facts.get("priority_choice", "未定")
+            dislikes = student_facts.get("dislikes", [])
             
         if "psychological_profile" in student_facts:
             holland_code = student_facts["psychological_profile"].get("holland_code_inferred", ["I", "R"])
@@ -241,7 +253,58 @@ class OutputGenerator:
         disclaimer_block = f"""> 🚨 **【AI 辅助说明与免责声明】**
 > 本报告内容均由 AI 辅助生成，仅供参考，不构成任何填报、录取或决策的承诺与建议。最终决定请你和家人结合官方信息综合判断。
 > 录取位次、招生计划等核心数据具有时效性与大小年波动风险，具体填报事项请前往 **[{authority_name}]({authority_url})** 查看和操作。
+>
+> ⚠️ **【平行志愿投档重要安全预警】**
+> **志愿填报必须勾选“服从专业调剂”**！平行志愿实行一次投档，若考生的档案投进某高校后，因分数不够所报专业且不服从调剂，高校将直接做退档处理。一旦退档，在本批次平行志愿中将不再有二次投档机会，直接滑档至征集志愿或下一批次。
 """
+
+        # Fetch 冲稳保 suggestions dynamically
+        rank_rec = self.evaluator.get_recommendations_by_rank(province, rank)
+        
+        # Build 冲稳保垫 block
+        rank_rec_block = ""
+        if rank_rec.get("冲") or rank_rec.get("稳") or rank_rec.get("保") or rank_rec.get("垫"):
+            rank_rec_block += "\n---\n\n## 🎯 动态位次志愿推荐 (冲稳保垫建议 - Heuristics Based on Live Rank)\n"
+            rank_rec_block += "根据您当前的高考位次，从 benchmark 数据库中筛选的推荐组合如下：\n\n"
+            
+            if rank_rec.get("冲"):
+                rank_rec_block += "### 🚀 冲刺学校 (Stretch Goals - 录取概率较小，适合冲击名校)\n"
+                for item in rank_rec["冲"]:
+                    rank_rec_block += f"- {item}\n"
+            if rank_rec.get("稳"):
+                rank_rec_block += "### ⚖️ 稳健学校 (Target Goals - 录取概率较大，建议重点关注)\n"
+                for item in rank_rec["稳"]:
+                    rank_rec_block += f"- {item}\n"
+            if rank_rec.get("保"):
+                rank_rec_block += "### 🛡️ 保底学校 (Safe Goals - 录取概率极高，防止滑档)\n"
+                for item in rank_rec["保"]:
+                    rank_rec_block += f"- {item}\n"
+            if rank_rec.get("垫"):
+                rank_rec_block += "### ⚓ 垫底学校 (Anchor Goals - 绝对安全志愿，用于极端兜底)\n"
+                for item in rank_rec["垫"]:
+                    rank_rec_block += f"- {item}\n"
+        else:
+            rank_rec_block += "\n---\n\n## 🎯 动态位次志愿推荐 (冲稳保垫建议)\n"
+            rank_rec_block += "⚠️ 警告：当前本地数据库中未收录该省份足够的录取最低位次数据。\n"
+            rank_rec_block += f"请您务必手动对照官方《高考志愿填报指南》中各高校往年的录取最低位次，与您的当前位次（{rank}）进行比对：\n"
+            rank_rec_block += f"- **冲**：往年录取最低位次在您位次的 80%~95% 区间（即您位次前 5%-20% 的学校）\n"
+            rank_rec_block += f"- **稳**：往年录取最低位次在您位次的 95%~120% 区间（即您位次左右的学校）\n"
+            rank_rec_block += f"- **保**：往年录取最低位次在您位次的 120%~145% 区间\n"
+            rank_rec_block += f"- **垫**：往年录取最低位次大于您位次的 145%（兜底保障线）\n"
+
+        # Build special paths suggestions
+        special_paths_block = ""
+        is_quick_income = (
+            "变现" in core_driver or "即就业" in core_driver or "尽快" in core_driver or "壁垒" in core_driver or
+            "尽快有稳定收入" in str(student_facts) or "尽快变现" in str(student_facts)
+        )
+        if willing_special in ["是", "y", "yes", "true", True] and is_quick_income:
+            special_paths_block += "\n---\n\n## 💡 特殊政策与提前批绿色通道 (Special Policy Channels)\n"
+            special_paths_block += "由于您有快速稳定变现的诉求，且愿意接受定向/专项计划，特为您匹配以下招生通道：\n\n"
+            special_paths_block += "1. **提前批公安警校**：建议重点关注省属警校（如广东警官学院等）的提前批公安类专业。毕业参加公安联考入警率超90%，4年本科毕业直接入警带编制。\n"
+            special_paths_block += "2. **公费定向师范生**：毕业直接回生源地带编任教，大学四年免学费且发生活补助，毕业即解决编制，最快4年变现。\n"
+            special_paths_block += "3. **农村卫生专项计划**：免费学医，5年毕业后定向基层医院带编安置，省去考公和长期规培读博的时间消耗。\n"
+            special_paths_block += "4. **电网/铁路订单班**：若匹配相关专科或工科，关注学校与南方电网、国家电网或铁路局的合作培养项目，毕业直通校招渠道。\n"
 
         # 8. Generate Markdown Report Content
         report = f"""# sanage Axis - 考生未来生存行动清单 (1+X 方案)
@@ -252,8 +315,12 @@ class OutputGenerator:
 - **考生UID**: {uid}
 - **高考省份**: {province}
 - **填报赛道**: {track_type}
-- **分数/省排名**: {score}
+- **分数/位次**: 文化分: {score} | 预估位次: {rank} | 艺术省排名: {art_province_ranking}
 - **选科组合**: {subjects}
+- **体检受限**: {body_restriction}
+- **接受定向/专项计划**: {willing_special}
+- **志愿取舍偏好**: {priority_choice}
+- **意向规避/排斥专业**: {", ".join(dislikes) if dislikes else "无"}
 - **省控批次线对比**: {batch_line_status}
 
 ## 🧠 职业性格与天赋诊断 (Talent Profile)
@@ -298,6 +365,12 @@ class OutputGenerator:
                 report += f"- **{rec['major']}** (契合分: `{rec['score']}`)\n"
                 report += f"  * 战略方向: `{rec.get('path', 'N/A')}`\n"
                 report += f"  * 推荐逻辑: {rec.get('reason', '')}\n"
+
+        if rank_rec_block:
+            report += rank_rec_block
+
+        if special_paths_block:
+            report += special_paths_block
 
         report += """
 ---

@@ -16,12 +16,17 @@ This file serves as a reference catalog for AI agents (e.g. Claude Code or claud
   - `evaluator.py` — Survival scores and compatibility ranks.
   - `injector.py` — Database lookups.
   - `trait_evaluator.py` — Holland Codes converter.
+  - `mbti_evaluator.py` — MBTI personality assessment and major matching (optional).
+  - `fallback_data.py` — Local fallback data for provincial lines and rank estimation (API unavailable).
   - `output_generator.py` — Report compiler helper.
 - `data/` — Static data files containing rules, cancellations, and score limits.
+- `tests/` — Test files for core functionality:
+  - `test_runner.py` — Integration tests for the main runner and interactive console.
 
 ## ⚙️ How to Call Subskills
 
 To execute the workflow pipeline:
+
 1. Load student details using `/profile` subskill. If inputs are missing, run the 8-question quiz.
 2. Feed compiled facts to `/analyze` subskill. The agent reads `data/` and performs adversarial reasoning.
 3. Pass analysis results to `/report` subskill to format and print the final document.

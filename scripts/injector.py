@@ -14,6 +14,7 @@ class KnowledgeInjector:
         self.cancelled_majors = []
         self.added_majors = []
         self.province_control_lines = []
+        self.score_lines = []
         self.five_year_plan = ""
         self.expert_rules = ""
         
@@ -23,6 +24,7 @@ class KnowledgeInjector:
         self._load_cancelled()
         self._load_added()
         self._load_province_control_lines()
+        self._load_score_lines()
         self._load_five_year_plan()
         self._load_expert_rules()
 
@@ -46,6 +48,13 @@ class KnowledgeInjector:
             with open(path, mode='r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
                 self.province_control_lines = [row for row in reader]
+
+    def _load_score_lines(self):
+        path = os.path.join(self.data_dir, 'score_lines_2024_2025.csv')
+        if os.path.exists(path):
+            with open(path, mode='r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                self.score_lines = [row for row in reader]
 
     def _load_five_year_plan(self):
         path = os.path.join(self.data_dir, '15th_five_year_plan.md')

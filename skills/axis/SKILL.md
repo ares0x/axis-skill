@@ -64,7 +64,7 @@ allowed-tools:
 
 ## State Guard (状态守卫)
 
-1. **强一致性约束**：每条回复结尾必须附加状态指示器：`[Current State: Profile Step X/4]` 或 `[Current State: Veto Audited]` 或 `[Current State: Export Ready]`。
-2. **严禁跳步**：如果 facts 中没有 `holland_code`（职业性格霍兰德代码）或 `core_driver`（求职驱动），说明状态处于 `Step 1/4` 或 `Step 2/4`，**严禁**跳过测试直接进入 `/analyze` 或 `/report` 阶段。
+1. **强一致性约束**：每条回复结尾必须附加状态指示器：`[Current State: Profile Step X/3]` 或 `[Current State: Veto Audited]` 或 `[Current State: Export Ready]`。
+2. **严禁跳步**：如果 facts 中没有 `holland_code`（职业性格霍兰德代码）或 `core_driver`（求职驱动力），说明状态处于 `Step 1/3` 或 `Step 2/3`，**严禁**跳过测试直接进入 `/analyze` 或 `/report` 阶段。
 3. **输出落盘规范**：最终的生存清单报告必须保存至 `workspace/sessions/{uid}/survival_report.md`，严禁在根目录生成 `result.md` 等临时垃圾文件。
 4. **重置触发**：如果用户修改了省份、赛道、选科等关键事实，必须清空目标专业候选池，重新进行推理。

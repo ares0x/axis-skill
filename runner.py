@@ -37,12 +37,39 @@ class AxisRunner:
         with open(facts_path, 'w', encoding='utf-8') as f:
             json.dump(facts, f, indent=2, ensure_ascii=False)
 
+    def sanitize_facts_schema(self, facts):
+        """Ensure facts has all expected v3.1 keys with proper nested structure."""
+        if not facts:
+            return facts
+        info = facts.setdefault("basic_info", {})
+        info.setdefault("uid", "")
+        info.setdefault("province", "")
+        info.setdefault("track_type", "夏季高考")
+        info.setdefault("subjects", "")
+        score_details = info.setdefault("score_details", {})
+        score_details.setdefault("culture_score", 0)
+        score_details.setdefault("art_province_ranking", 0)
+        score_details.setdefault("rank", 0)
+        info.setdefault("body_restriction", "无")
+        info.setdefault("willing_special", "否")
+        info.setdefault("priority_choice", "未定")
+        info.setdefault("dislikes", [])
+        
+        profile = facts.setdefault("psychological_profile", {})
+        profile.setdefault("holland_code_inferred", [])
+        profile.setdefault("core_driver", "")
+        profile.setdefault("derived_strengths", [])
+        profile.setdefault("blind_spots", [])
+        facts.setdefault("Target Majors", [])
+        return facts
+
     def load_facts(self, uid):
         """Load facts.json for the session."""
         facts_path = os.path.join(self.sessions_dir, uid, 'facts.json')
         if os.path.exists(facts_path):
             with open(facts_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                facts = json.load(f)
+                return self.sanitize_facts_schema(facts)
         return {}
 
     def update_blind_spots(self, uid, content):
@@ -52,30 +79,37 @@ class AxisRunner:
             f.write(content)
 
     def get_profile_step(self, facts):
-        """Calculate current profile step (1 to 4) under v3.0 schema."""
+        """Calculate current profile step (0 to 3) under the new 3 Quality Gates schema."""
         if not facts:
-            return 1
+            return 0
             
         info = facts.get("basic_info", {})
         profile = facts.get("psychological_profile", {})
         
-        # Step 1: uid, province, track_type, score
-        step1 = bool(info.get("uid") and info.get("province") and info.get("track_type") and 
-                     (info.get("score_details", {}).get("culture_score") or info.get("score_details", {}).get("art_province_ranking")))
-                     
-        # Step 2: subjects
-        step2 = step1 and bool(info.get("subjects"))
+        # Gate 1: Hard Facts (Province, track, subjects, score/rank)
+        has_score_or_rank = bool(
+            info.get("score_details", {}).get("culture_score") or 
+            info.get("score_details", {}).get("art_province_ranking") or 
+            info.get("score_details", {}).get("rank")
+        )
+        gate1 = bool(info.get("uid") and info.get("province") and info.get("track_type") and info.get("subjects") and has_score_or_rank)
+                      
+        # Gate 2: Career Strategy & Preferences (core_driver, body_restriction, willing_special, priority_choice)
+        gate2 = gate1 and bool(
+            profile.get("core_driver") and 
+            info.get("body_restriction") and 
+            info.get("willing_special") and 
+            info.get("priority_choice") and 
+            info.get("priority_choice") != "未定"
+        )
         
-        # Step 3: Holland codes
-        step3 = step2 and bool(profile.get("holland_code_inferred"))
+        # Gate 3: Major Interests & Heuristics (Holland codes)
+        gate3 = gate2 and bool(profile.get("holland_code_inferred"))
         
-        # Step 4: Core driver / expectations
-        step4 = step3 and bool(profile.get("core_driver"))
-        
-        if step4: return 4
-        if step3: return 3
-        if step2: return 2
-        return 1
+        if gate3: return 3
+        if gate2: return 2
+        if gate1: return 1
+        return 0
 
     def handle_init(self, uid, interactive=True):
         """Initialize session for the student under v3.0 nested structure."""
@@ -94,12 +128,18 @@ class AxisRunner:
                     "subjects": "",
                     "score_details": {
                         "culture_score": 0,
-                        "art_province_ranking": 0
-                    }
+                        "art_province_ranking": 0,
+                        "rank": 0
+                    },
+                    "body_restriction": "无",
+                    "willing_special": "否",
+                    "priority_choice": "未定",
+                    "dislikes": []
                 },
                 "psychological_profile": {
                     "holland_code_inferred": [],
                     "core_driver": "",
+                    "mbti_type": "",
                     "derived_strengths": [],
                     "blind_spots": []
                 },
@@ -199,10 +239,10 @@ class AxisRunner:
         print("==============================================================\n")
         
         step = self.get_profile_step(self.current_facts)
-        print(f"[Current State: Profile Step {step}/4]")
+        print(f"[Current State: Profile Step {step}/3]")
 
     def print_status(self):
-        """Print current profile status and fields under v3.0 nested structure."""
+        """Print current profile status and fields under new 3 Quality Gates structure."""
         if not self.current_uid:
             print("❌ No active student session. Run `/init [uid]` first.")
             return
@@ -210,26 +250,32 @@ class AxisRunner:
         info = self.current_facts.get("basic_info", {})
         profile = self.current_facts.get("psychological_profile", {})
         
-        print("\n================ STUDENT PROFILE STATUS (v3.0) ================")
+        print("\n================ STUDENT PROFILE STATUS ================")
         print(f"UID: {info.get('uid')}")
         print(f"Province (省份): {info.get('province') or '[Missing]'}")
         print(f"Track Type (填报赛道): {info.get('track_type') or '[Missing]'}")
         print(f"Culture Score (文化分): {info.get('score_details', {}).get('culture_score') or '[Missing]'}")
+        print(f"Rank (位次): {info.get('score_details', {}).get('rank') or '[Missing]'}")
         print(f"Art Rank (艺术省排名): {info.get('score_details', {}).get('art_province_ranking') or '[Missing]'}")
         print(f"Subjects (选科): {info.get('subjects') or '[Missing]'}")
+        print(f"Body Restriction (体检限制): {info.get('body_restriction') or '无'}")
+        print(f"Willing Special (是否接受定向/专项): {info.get('willing_special') or '否'}")
+        print(f"Priority (志愿取舍偏好): {info.get('priority_choice') or '未定'}")
+        print(f"Dislikes (意向规避/排斥专业): {info.get('dislikes') or '[]'}")
         if info.get("province") and info.get("track_type") and info.get("score_details", {}).get("culture_score"):
             status = self.evaluator.get_batch_lines_status(self.current_facts)
             print(f"Province Control Lines (省控线对比): {status}")
         print(f"Holland Code (霍兰德人格): {profile.get('holland_code_inferred') or '[Missing]'}")
         print(f"Core Driver (核心求职驱力): {profile.get('core_driver') or '[Missing]'}")
         print(f"Strengths (长板优势): {profile.get('derived_strengths') or '[]'}")
+        print(f"MBTI (可选): {profile.get('mbti_type') or '[Not Provided]'}")
         print(f"Target Majors (目标专业): {self.current_facts.get('Target Majors', [])}")
         
         step = self.get_profile_step(self.current_facts)
-        print(f"Profile Completion: Step {step}/4")
+        print(f"Profile Completion: Step {step}/3")
         print("================================================================\n")
         
-        print(f"[Current State: Profile Step {step}/4]")
+        print(f"[Current State: Profile Step {step}/3]")
 
     def handle_set(self, args_str):
         """Set specific profile fields in v3.0 nested facts.json."""
@@ -240,7 +286,7 @@ class AxisRunner:
         parts = args_str.split(' ', 1)
         if len(parts) < 2:
             print("❌ Invalid set command. Format: `/set [key] [value]`")
-            print("Valid keys: `province`, `track`, `score`, `art_rank`, `subjects`, `holland_code`, `core_driver`")
+            print("Valid keys: `province`, `track`, `score`, `rank`, `art_rank`, `subjects`, `holland_code`, `core_driver`, `mbti`, `body_restriction`, `willing_special`")
             return
             
         key, value = parts[0].strip().lower(), parts[1].strip()
@@ -262,7 +308,20 @@ class AxisRunner:
             is_critical = True
         elif key == "score":
             old_val = str(info["score_details"].get("culture_score", ""))
-            info["score_details"]["culture_score"] = int(value) if value.isdigit() else 0
+            score_int = int(value) if value.isdigit() else 0
+            info["score_details"]["culture_score"] = score_int
+            # Auto-conversion to rank if province is set
+            prov = info.get("province", "")
+            track = info.get("track_type", "夏季高考")
+            if prov and score_int > 0:
+                resolved_rank = self.evaluator.get_rank_from_score(prov, 2025, track, score_int)
+                if resolved_rank:
+                    info["score_details"]["rank"] = resolved_rank
+                    print(f"⚡ [Auto-Rank] Converted score {score_int} to estimated rank: {resolved_rank} (using 2025 data).")
+        elif key == "rank":
+            old_val = str(info["score_details"].get("rank", ""))
+            info["score_details"]["rank"] = int(value) if value.isdigit() else 0
+            is_critical = True
         elif key == "art_rank":
             old_val = str(info["score_details"].get("art_province_ranking", ""))
             info["score_details"]["art_province_ranking"] = int(value) if value.isdigit() else 0
@@ -279,8 +338,36 @@ class AxisRunner:
             profile = self.current_facts["psychological_profile"]
             old_val = profile.get("core_driver", "")
             profile["core_driver"] = value
+        elif key in ["mbti", "mbti_type"]:
+            profile = self.current_facts["psychological_profile"]
+            old_val = profile.get("mbti_type", "")
+            # 标准化 MBTI 输入
+            mbti_value = value.strip().upper()
+            # 验证 MBTI 格式 (4个字母)
+            if len(mbti_value) == 4:
+                profile["mbti_type"] = mbti_value
+                print(f"✅ MBTI set to {mbti_value}")
+            else:
+                print(f"⚠️ MBTI should be 4 letters (like INTJ, ENFP). Saved anyway.")
+                profile["mbti_type"] = mbti_value
+        elif key in ["body_restriction", "restriction"]:
+            old_val = info.get("body_restriction", "")
+            info["body_restriction"] = value
+            is_critical = True
+        elif key in ["willing_special", "special"]:
+            old_val = info.get("willing_special", "")
+            info["willing_special"] = value
+            is_critical = True
+        elif key in ["priority", "priority_choice"]:
+            old_val = info.get("priority_choice", "")
+            info["priority_choice"] = value
+            is_critical = True
+        elif key in ["dislikes", "avoid"]:
+            old_val = ",".join(info.get("dislikes", []))
+            info["dislikes"] = [x.strip() for x in value.split(",") if x.strip()]
+            is_critical = True
         else:
-            print(f"❌ Unknown key '{key}'. Valid keys: `province`, `track`, `score`, `art_rank`, `subjects`, `holland_code`, `core_driver`")
+            print(f"❌ Unknown key '{key}'. Valid keys: `province`, `track`, `score`, `rank`, `art_rank`, `subjects`, `holland_code`, `core_driver`, `mbti`, `body_restriction`, `willing_special`, `priority`, `dislikes`")
             return
             
         if old_val != value:
@@ -297,7 +384,7 @@ class AxisRunner:
             
         step = self.get_profile_step(self.current_facts)
         print(f"✅ Set '{key}' to '{value}'.")
-        print(f"[Current State: Profile Step {step}/4]")
+        print(f"[Current State: Profile Step {step}/3]")
 
     def handle_add_major(self, major_name):
         """Add a major to candidate's list."""
@@ -319,7 +406,7 @@ class AxisRunner:
             print(f"ℹ️ '{major_name}' is already in target majors.")
             
         step = self.get_profile_step(self.current_facts)
-        print(f"[Current State: Profile Step {step}/4]")
+        print(f"[Current State: Profile Step {step}/3]")
 
     def handle_veto(self):
         """Run veto officer check with Adversarial Review."""
@@ -328,8 +415,8 @@ class AxisRunner:
             return
             
         step = self.get_profile_step(self.current_facts)
-        if step < 4:
-            print(f"⚠️ Profile is not complete (Step {step}/4). Please fill all fields or run `/explore` first.")
+        if step < 2:
+            print(f"⚠️ Profile is not complete (Step {step}/3). Gate 1 (Hard Facts) and Gate 2 (Career Strategy & Preferences) are required to run VETO.")
             return
             
         print("\n🛡️ [Veto Officer] Running Adversarial Review v3.0 checks...")
@@ -390,8 +477,8 @@ class AxisRunner:
             return
             
         step = self.get_profile_step(self.current_facts)
-        if step < 4:
-            print(f"⚠️ Profile is not complete (Step {step}/4). Please fill all fields or run `/explore` first.")
+        if step < 2:
+            print(f"⚠️ Profile is not complete (Step {step}/3). Gate 1 (Hard Facts) and Gate 2 (Career Strategy & Preferences) are required to run Audit.")
             return
             
         print("\n⚖️ [Survival Audit Officer] Auditing payback period and city priority rules...")
@@ -430,8 +517,8 @@ class AxisRunner:
             return
             
         step = self.get_profile_step(self.current_facts)
-        if step < 4:
-            print(f"⚠️ Profile is not complete (Step {step}/4). Cannot export final recommendations.")
+        if step < 2:
+            print(f"⚠️ Profile is not complete (Step {step}/3). Gate 1 (Hard Facts) and Gate 2 (Career Strategy & Preferences) are required to compile the report.")
             return
             
         print("\n📦 Generating '1+X' future survival report...")
@@ -477,9 +564,11 @@ class AxisRunner:
         
         iso_timestamp = datetime.now().astimezone().isoformat(timespec='seconds')
         step = self.get_profile_step(self.current_facts)
-        stage = f"Profile Step {step}/4"
-        if step == 4:
+        stage = f"Profile Step {step}/3"
+        if step == 3:
             stage = "Profile Complete"
+        elif step == 2:
+            stage = "Export Ready"
             
         # Serialize YAML frontmatter
         yaml_lines = [
@@ -490,8 +579,11 @@ class AxisRunner:
             f"province: '{info.get('province', '')}'",
             f"track: '{info.get('track_type', '')}'",
             f"score: {info.get('score_details', {}).get('culture_score', 0)}",
+            f"rank: {info.get('score_details', {}).get('rank', 0)}",
             f"art_rank: {info.get('score_details', {}).get('art_province_ranking', 0)}",
             f"subjects: '{info.get('subjects', '')}'",
+            f"body_restriction: '{info.get('body_restriction', '无')}'",
+            f"willing_special: '{info.get('willing_special', '否')}'",
             f"holland_code: {json.dumps(profile.get('holland_code_inferred', []), ensure_ascii=False)}",
             f"core_driver: '{profile.get('core_driver', '')}'",
             f"stage: '{stage}'",
@@ -581,8 +673,12 @@ class AxisRunner:
         info["subjects"] = frontmatter.get("subjects", "")
         if "score" in frontmatter:
             info["score_details"]["culture_score"] = int(frontmatter["score"])
+        if "rank" in frontmatter:
+            info["score_details"]["rank"] = int(frontmatter["rank"])
         if "art_rank" in frontmatter:
             info["score_details"]["art_province_ranking"] = int(frontmatter["art_rank"])
+        info["body_restriction"] = frontmatter.get("body_restriction", "无")
+        info["willing_special"] = frontmatter.get("willing_special", "否")
             
         # Restore psychological profile
         profile = self.current_facts["psychological_profile"]
