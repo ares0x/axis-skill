@@ -50,6 +50,8 @@ class AxisRunner:
         score_details.setdefault("culture_score", 0)
         score_details.setdefault("art_province_ranking", 0)
         score_details.setdefault("rank", 0)
+        info.setdefault("region_preference", "")
+        info.setdefault("financial_ability", "")
         info.setdefault("body_restriction", "无")
         info.setdefault("willing_special", "否")
         info.setdefault("priority_choice", "未定")
@@ -58,6 +60,7 @@ class AxisRunner:
         profile = facts.setdefault("psychological_profile", {})
         profile.setdefault("holland_code_inferred", [])
         profile.setdefault("core_driver", "")
+        profile.setdefault("mbti_type", "")
         profile.setdefault("derived_strengths", [])
         profile.setdefault("blind_spots", [])
         facts.setdefault("Target Majors", [])
@@ -94,9 +97,11 @@ class AxisRunner:
         )
         gate1 = bool(info.get("uid") and info.get("province") and info.get("track_type") and info.get("subjects") and has_score_or_rank)
                       
-        # Gate 2: Career Strategy & Preferences (core_driver, body_restriction, willing_special, priority_choice)
+        # Gate 2: Career Strategy & Preferences (core_driver, region_preference, financial_ability, body_restriction, willing_special, priority_choice)
         gate2 = gate1 and bool(
             profile.get("core_driver") and 
+            info.get("region_preference") and 
+            info.get("financial_ability") and 
             info.get("body_restriction") and 
             info.get("willing_special") and 
             info.get("priority_choice") and 
@@ -131,6 +136,8 @@ class AxisRunner:
                         "art_province_ranking": 0,
                         "rank": 0
                     },
+                    "region_preference": "",
+                    "financial_ability": "",
                     "body_restriction": "无",
                     "willing_special": "否",
                     "priority_choice": "未定",
@@ -258,6 +265,8 @@ class AxisRunner:
         print(f"Rank (位次): {info.get('score_details', {}).get('rank') or '[Missing]'}")
         print(f"Art Rank (艺术省排名): {info.get('score_details', {}).get('art_province_ranking') or '[Missing]'}")
         print(f"Subjects (选科): {info.get('subjects') or '[Missing]'}")
+        print(f"Region Preference (城市偏好): {info.get('region_preference') or '[Missing]'}")
+        print(f"Financial Ability (家庭经济情况): {info.get('financial_ability') or '[Missing]'}")
         print(f"Body Restriction (体检限制): {info.get('body_restriction') or '无'}")
         print(f"Willing Special (是否接受定向/专项): {info.get('willing_special') or '否'}")
         print(f"Priority (志愿取舍偏好): {info.get('priority_choice') or '未定'}")
@@ -366,8 +375,16 @@ class AxisRunner:
             old_val = ",".join(info.get("dislikes", []))
             info["dislikes"] = [x.strip() for x in value.split(",") if x.strip()]
             is_critical = True
+        elif key in ["region", "region_preference"]:
+            old_val = info.get("region_preference", "")
+            info["region_preference"] = value
+            is_critical = True
+        elif key in ["financial", "financial_ability"]:
+            old_val = info.get("financial_ability", "")
+            info["financial_ability"] = value
+            is_critical = True
         else:
-            print(f"❌ Unknown key '{key}'. Valid keys: `province`, `track`, `score`, `rank`, `art_rank`, `subjects`, `holland_code`, `core_driver`, `mbti`, `body_restriction`, `willing_special`, `priority`, `dislikes`")
+            print(f"❌ Unknown key '{key}'. Valid keys: `province`, `track`, `score`, `rank`, `art_rank`, `subjects`, `holland_code`, `core_driver`, `mbti`, `body_restriction`, `willing_special`, `priority`, `dislikes`, `region`, `financial`")
             return
             
         if old_val != value:
@@ -582,10 +599,15 @@ class AxisRunner:
             f"rank: {info.get('score_details', {}).get('rank', 0)}",
             f"art_rank: {info.get('score_details', {}).get('art_province_ranking', 0)}",
             f"subjects: '{info.get('subjects', '')}'",
+            f"region_preference: '{info.get('region_preference', '')}'",
+            f"financial_ability: '{info.get('financial_ability', '')}'",
             f"body_restriction: '{info.get('body_restriction', '无')}'",
             f"willing_special: '{info.get('willing_special', '否')}'",
+            f"priority_choice: '{info.get('priority_choice', '未定')}'",
+            f"dislikes: {json.dumps(info.get('dislikes', []), ensure_ascii=False)}",
             f"holland_code: {json.dumps(profile.get('holland_code_inferred', []), ensure_ascii=False)}",
             f"core_driver: '{profile.get('core_driver', '')}'",
+            f"mbti_type: '{profile.get('mbti_type', '')}'",
             f"stage: '{stage}'",
             "---"
         ]
@@ -677,13 +699,18 @@ class AxisRunner:
             info["score_details"]["rank"] = int(frontmatter["rank"])
         if "art_rank" in frontmatter:
             info["score_details"]["art_province_ranking"] = int(frontmatter["art_rank"])
+        info["region_preference"] = frontmatter.get("region_preference", "")
+        info["financial_ability"] = frontmatter.get("financial_ability", "")
         info["body_restriction"] = frontmatter.get("body_restriction", "无")
         info["willing_special"] = frontmatter.get("willing_special", "否")
+        info["priority_choice"] = frontmatter.get("priority_choice", "未定")
+        info["dislikes"] = frontmatter.get("dislikes", [])
             
         # Restore psychological profile
         profile = self.current_facts["psychological_profile"]
         profile["holland_code_inferred"] = frontmatter.get("holland_code", [])
         profile["core_driver"] = frontmatter.get("core_driver", "")
+        profile["mbti_type"] = frontmatter.get("mbti_type", "")
         
         # Parse target majors from body
         target_majors = []
