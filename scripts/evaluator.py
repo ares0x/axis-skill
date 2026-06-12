@@ -123,19 +123,29 @@ class MajorEvaluator:
         
         return major_name
 
+    def _fuzzy_match_rate(self, name_lower, lookup_dict):
+        """Exact-first match, then length-ratio-guarded substring.
+        Prevents short generic keys like "自动化"(3 chars) from matching
+        compound names like "电气工程及其自动化"(9 chars)."""
+        # 1. Exact match (highest priority)
+        if name_lower in lookup_dict:
+            return lookup_dict[name_lower]
+        # 2. Substring with length-ratio guard (≥60%)
+        best_rate, best_len = 0.50, 0
+        for key, rate in lookup_dict.items():
+            if key in name_lower or name_lower in key:
+                shorter = min(len(key), len(name_lower))
+                longer = max(len(key), len(name_lower))
+                if shorter >= 2 and shorter / longer >= 0.6:
+                    if len(key) > best_len:
+                        best_rate, best_len = rate, len(key)
+        return best_rate
+
     def get_ai_replacement_rate(self, major_name):
-        major_lower = major_name.lower()
-        for key, rate in self.ai_replacement_rates.items():
-            if key in major_lower or major_lower in key:
-                return rate
-        return 0.50  # Default moderate risk
+        return self._fuzzy_match_rate(major_name.lower(), self.ai_replacement_rates)
 
     def get_employment_stability(self, major_name):
-        major_lower = major_name.lower()
-        for key, rate in self.employment_stability.items():
-            if key in major_lower or major_lower in key:
-                return rate
-        return 0.50  # Default moderate stability
+        return self._fuzzy_match_rate(major_name.lower(), self.employment_stability)
 
     def get_rank_from_score(self, province, year, stream, score):
         """

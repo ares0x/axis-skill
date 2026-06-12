@@ -1,11 +1,19 @@
 {
-    "name": "axis-skill",
-    "version": "2.0.0",
-    "description": "融合了张雪峰流派功利主义逻辑、产业政策分析与 Holland 职业测评的高考志愿选择顾问，帮助考生在 AI 替代浪潮中做出能保护未来生存能力的报考决策。",
-    "instructions": "你是一位融合了张雪峰流派功利主义逻辑、产业政策分析、Holland 职业测评的高考志愿顾问。你的目标是帮助考生在 AI 替代浪潮 and 产业结构剧变的背景下，做出真正能保护他们未来生存能力的报考决策。必须在推理前读取 data/ 知识库并遵守 3 级严密质量闸门约束。",
-    "entrypoint": "SKILL.md",
-    "author": "Jace",
-    "homepage": "https://github.com/ares0x/axis-skill",
-    "repository": "https://github.com/ares0x/axis-skill",
-    "keywords": ["高考", "志愿", "专业", "录取", "报考", "选专业", "填志愿"]
+  "name": "axis-skill",
+  "version": "2.1.0",
+  "description": "\u878d\u5408\u4e86\u5f20\u96ea\u5cf0\u6d41\u6d3e\u529f\u5229\u4e3b\u4e49\u903b\u8f91\u3001\u4ea7\u4e1a\u653f\u7b56\u5206\u6790\u4e0e Holland \u804c\u4e1a\u6d4b\u8bc4\u7684\u9ad8\u8003\u5fd7\u613f\u9009\u62e9\u987e\u95ee\uff0c\u5e2e\u52a9\u8003\u751f\u5728 AI \u66ff\u4ee3\u6d6a\u6f6e\u4e2d\u505a\u51fa\u80fd\u4fdd\u62a4\u672a\u6765\u751f\u5b58\u80fd\u529b\u7684\u62a5\u8003\u51b3\u7b56\u3002",
+  "instructions": "\u4f60\u662f\u4e00\u4f4d\u878d\u5408\u4e86\u5f20\u96ea\u5cf0\u6d41\u6d3e\u529f\u5229\u4e3b\u4e49\u903b\u8f91\u3001\u4ea7\u4e1a\u653f\u7b56\u5206\u6790\u3001Holland \u804c\u4e1a\u6d4b\u8bc4\u7684\u9ad8\u8003\u5fd7\u613f\u987e\u95ee\u3002\u4f60\u7684\u76ee\u6807\u662f\u5e2e\u52a9\u8003\u751f\u5728 AI \u66ff\u4ee3\u6d6a\u6f6e and \u4ea7\u4e1a\u7ed3\u6784\u5267\u53d8\u7684\u80cc\u666f\u4e0b\uff0c\u505a\u51fa\u771f\u6b63\u80fd\u4fdd\u62a4\u4ed6\u4eec\u672a\u6765\u751f\u5b58\u80fd\u529b\u7684\u62a5\u8003\u51b3\u7b56\u3002\u5fc5\u987b\u5728\u63a8\u7406\u524d\u8bfb\u53d6 data/ \u77e5\u8bc6\u5e93\u5e76\u9075\u5b88 3 \u7ea7\u4e25\u5bc6\u8d28\u91cf\u95f8\u95e8\u7ea6\u675f\u3002",
+  "entrypoint": "SKILL.md",
+  "author": "Jace",
+  "homepage": "https://github.com/ares0x/axis-skill",
+  "repository": "https://github.com/ares0x/axis-skill",
+  "keywords": [
+    "\u9ad8\u8003",
+    "\u5fd7\u613f",
+    "\u4e13\u4e1a",
+    "\u5f55\u53d6",
+    "\u62a5\u8003",
+    "\u9009\u4e13\u4e1a",
+    "\u586b\u5fd7\u613f"
+  ]
 }

@@ -36,6 +36,7 @@ allowed-tools:
 - `data/2026_cancelled_majors.csv` — 教育部撤销专业名单
 - `data/2026_added_majors.csv` — 教育部新增战略专业名单
 - `data/score_lines_2024_2025.csv` — 历年省市高校专业录取最低分数线与位次
+- `data/ai_replacement_framework.md` — AI 替代风险分析框架（WEF/ILO/麦肯锡/高盛研究综合，含高替代率专业排序与传导链条）
 
 **流程协议文件（按阶段按需读取）**：
 

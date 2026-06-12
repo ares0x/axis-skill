@@ -71,16 +71,35 @@ class KnowledgeInjector:
     def check_major_cancelled(self, major_name, institution_level):
         """
         Check if a major is in the cancelled list.
-        Supports fuzzy name matching.
+        Supports fuzzy name matching with length-ratio guard to prevent
+        short generic names (e.g. "自动化") from false-matching unrelated
+        longer names (e.g. "电气工程及其自动化").
         """
         major_name_lower = major_name.lower()
         for row in self.cancelled_majors:
             name_key = 'MajorName' if 'MajorName' in row else 'major_name'
             level_key = 'InstitutionLevel' if 'InstitutionLevel' in row else 'risk_level'
-            
+
             full_name_lower = row.get(name_key, '').lower()
-            # If the query is a substring of the major name, or vice versa
-            if major_name_lower in full_name_lower or any(part in major_name_lower for part in full_name_lower.replace('(', ' ').replace(')', ' ').split() if len(part) > 1):
+
+            matched = False
+            # 1. Exact match
+            if major_name_lower == full_name_lower:
+                matched = True
+            # 2. CSV entry is a prefix of the query (e.g. "会计" in "会计学")
+            elif full_name_lower and major_name_lower.startswith(full_name_lower):
+                matched = True
+            # 3. Query is a prefix of the CSV entry (e.g. "会计学" contains "会计")
+            elif major_name_lower and full_name_lower.startswith(major_name_lower):
+                matched = True
+            # 4. Substring match with length-ratio guard (≥ 60%)
+            elif (major_name_lower in full_name_lower or full_name_lower in major_name_lower):
+                shorter = min(len(major_name_lower), len(full_name_lower))
+                longer = max(len(major_name_lower), len(full_name_lower))
+                if shorter >= 2 and shorter / longer >= 0.6:
+                    matched = True
+
+            if matched:
                 level = row.get(level_key, 'All')
                 if level.lower() in ['all', 'high', 'medium'] or level.lower() == institution_level.lower():
                     return row
