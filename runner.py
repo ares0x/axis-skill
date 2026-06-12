@@ -227,6 +227,12 @@ class AxisRunner:
         while q2_ans not in ['A', 'B', 'C']:
             q2_ans = input("Choose (A/B/C): ").strip().upper()
             
+        print("\n🎯 Q3 (可选): 你是否知道自己的 MBTI 类型？")
+        print("例如 INTJ、ENFP、INFJ 这类 4 字母的性格类型。")
+        print("如果知道，请直接输入；如果不知道，可直接按回车跳过：")
+        
+        mbti_ans = input("Enter MBTI (or press Enter to skip): ").strip().upper()
+        
         # Run evaluator
         results = self.trait_evaluator.evaluate_traits(q1_ans, q2_ans)
         
@@ -235,14 +241,25 @@ class AxisRunner:
         profile["holland_code_inferred"] = results["holland_code_inferred"]
         profile["core_driver"] = results["core_driver"]
         profile["derived_strengths"] = results["derived_strengths"]
-        
+        if mbti_ans:
+            profile["mbti_type"] = mbti_ans
+            
         self.save_facts(self.current_uid, self.current_facts)
-        self.log_timeline(self.current_uid, f"Completed talent assessment. Holland: {results['holland_code_inferred']}, Driver: {results['core_driver']}")
+        
+        log_msg = f"Completed talent assessment. Holland: {results['holland_code_inferred']}, Driver: {results['core_driver']}"
+        if mbti_ans:
+            log_msg += f", MBTI: {mbti_ans}"
+        self.log_timeline(self.current_uid, log_msg)
         
         print("\n✅ Assessment completed and saved!")
         print(f"   Holland Codes: {results['holland_code_inferred']}")
         print(f"   Core Driver: {results['core_driver']}")
         print(f"   Derived Strengths: {results['derived_strengths']}")
+        if mbti_ans:
+            if len(mbti_ans) == 4:
+                print(f"   MBTI Type: {mbti_ans}")
+            else:
+                print(f"   MBTI Type: {mbti_ans} (⚠️ 格式非标准4字母)")
         print("==============================================================\n")
         
         step = self.get_profile_step(self.current_facts)
