@@ -54,7 +54,7 @@ def parse_markdown_with_frontmatter(content):
             else:
                 body_lines.append(line)
         body = "\n".join(body_lines)
-        
+
         # Simple key-value parser
         for line in yaml_lines:
             if ":" in line:
@@ -94,7 +94,7 @@ class OutputGenerator:
             if len(snapshot_files) >= 1:
                 evolution_section = "\n## 📈 志愿偏好与决策演进过程 (Counseling Preference Evolution)\n\n"
                 evolution_section += "在咨询评估过程中，考生的报考志愿经历以下调整：\n\n"
-                
+
                 for idx, filename in enumerate(snapshot_files, 1):
                     filepath = os.path.join(snapshots_dir, filename)
                     with open(filepath, 'r', encoding='utf-8') as sf:
@@ -106,7 +106,7 @@ class OutputGenerator:
                         formatted_ts = f"{timestamp[:4]}-{timestamp[4:6]}-{timestamp[6:8]} {timestamp[9:11]}:{timestamp[11:13]}"
                     else:
                         formatted_ts = timestamp
-                    
+
                     # Parse target majors
                     target_majors = []
                     in_targets = False
@@ -122,12 +122,12 @@ class OutputGenerator:
                                 major = line_strip[1:].strip()
                                 if major and major != "（暂无）":
                                     target_majors.append(major)
-                                    
+
                     majors_str = "、".join(target_majors) if target_majors else "无"
                     evolution_section += f"- **阶段 {idx} ({formatted_ts})** · *{title}*  \n"
                     evolution_section += f"  - 目标专业候选池: `{majors_str}`  \n"
                     evolution_section += f"  - 状态阶段: `{fm.get('stage', '未标记')}`\n"
-                
+
                 evolution_section += "\n---\n"
 
         # 2. Safely unpack nested or flat schemas
@@ -155,7 +155,7 @@ class OutputGenerator:
             willing_special = student_facts.get("willing_special", "否")
             priority_choice = student_facts.get("priority_choice", "未定")
             dislikes = student_facts.get("dislikes", [])
-            
+
         if "psychological_profile" in student_facts:
             holland_code = student_facts["psychological_profile"].get("holland_code_inferred", ["I", "R"])
             core_driver = student_facts["psychological_profile"].get("core_driver", "普通期望")
@@ -180,15 +180,15 @@ class OutputGenerator:
                 target_majors = ["数字媒体艺术", "视觉传达设计"]
             else:
                 target_majors = ["数学与应用数学", "英语", "土木工程"]
-                
+
         # 2. Run target evaluations
         evals = []
         for major in target_majors:
             eval_res = self.evaluator.evaluate_major(major, student_facts)
             evals.append(eval_res)
-            
+
         evals.sort(key=lambda x: (x['fit_score'], x['survival_score']), reverse=True)
-        
+
         approved_evals = [e for e in evals if not e['is_vetoed']]
         if approved_evals:
             primary_plan = approved_evals[0]
@@ -208,7 +208,7 @@ class OutputGenerator:
         hedging_actions = []
         if primary_plan:
             major_name = primary_plan['major']
-            
+
             if any(k in major_name for k in ["电气", "电网", "电力"]):
                 hedging_actions = [
                     "【技能对冲】学习工控PLC编程与微电网调度算法，向智能电网数字化方向升级，避免沦为单纯的变电站值班人员。",
@@ -260,13 +260,13 @@ class OutputGenerator:
 
         # Fetch 冲稳保 suggestions dynamically
         rank_rec = self.evaluator.get_recommendations_by_rank(province, rank)
-        
+
         # Build 冲稳保垫 block
         rank_rec_block = ""
         if rank_rec.get("冲") or rank_rec.get("稳") or rank_rec.get("保") or rank_rec.get("垫"):
             rank_rec_block += "\n---\n\n## 🎯 动态位次志愿推荐 (冲稳保垫建议 - Heuristics Based on Live Rank)\n"
             rank_rec_block += "根据您当前的高考位次，从 benchmark 数据库中筛选的推荐组合如下：\n\n"
-            
+
             if rank_rec.get("冲"):
                 rank_rec_block += "### 🚀 冲刺学校 (Stretch Goals - 录取概率较小，适合冲击名校)\n"
                 for item in rank_rec["冲"]:
@@ -385,7 +385,7 @@ class OutputGenerator:
                 for reason in ev['veto_reasons']:
                     report += f"- {reason}\n"
                 report += f"- AI替代系数: `{int(ev['ai_replacement_index']*100)}%` | 生存分: `{ev['survival_score']}`\n\n"
-        
+
         if veto_count == 0:
             report += "- 志愿候选池中暂未触发硬性风险熔断。安全。\n"
 
@@ -397,7 +397,7 @@ class OutputGenerator:
 """
         for action in hedging_actions:
             report += f"- {action}\n"
-            
+
         # 9. Append Dynamic Data Sources Table
         report += f"""
 ---
@@ -409,6 +409,10 @@ class OutputGenerator:
 - **战略新增专业与撤销专业名单**: 中华人民共和国教育部官方公开数据 · 采集年份：2026 · 采集于 2026-03
 
 ---
+
+*💡 本报告由 **[sanage Axis](https://github.com/ares0x/axis-skill)** 高考志愿 AI 顾问（开发者：**Jace**）辅助生成。*
+*如有疑问或需获取最新志愿填报规则，欢迎关注：**Sanage Lab** (抖音/小红书)。*
+
 `[Current State: Export Ready] - Axis System Output generated successfully.`
 """
         # Sanitize report content for promise words

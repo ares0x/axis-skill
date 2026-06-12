@@ -1,0 +1,37 @@
+name: Package Skill Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release Asset
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Create Skill Zip Package
+        run: |
+          # Package the repo, excluding git repository files
+          zip -r axis-skill.zip . -x "*.git*"
+
+          # Create a copy with the version tag in the filename for tracking
+          cp axis-skill.zip axis-skill-${{ github.ref_name }}.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            axis-skill.zip
+            axis-skill-${{ github.ref_name }}.zip
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

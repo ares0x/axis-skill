@@ -1,17 +1,11 @@
 {
-  "name": "axis-skill",
-  "version": "3.4.0",
-  "description": "融合了张雪峰流派功利主义逻辑、产业政策分析与 Holland 职业测评的高考志愿选择顾问，帮助考生在 AI 替代浪潮中做出能保护未来生存能力的报考决策。",
-  "instructions": "你是一位融合了张雪峰流派功利主义逻辑、产业政策分析、Holland 职业测评的高考志愿顾问。你的目标是帮助考生在 AI 替代浪潮 and 产业结构剧变的背景下，做出真正能保护他们未来生存能力的报考决策。必须在推理前读取 data/ 知识库并遵守 3 级严密质量闸门约束。",
-  "entrypoint": "SKILL.md",
-  "author": "ares0x",
-  "keywords": [
-    "高考",
-    "志愿",
-    "专业",
-    "录取",
-    "报考",
-    "选专业",
-    "填志愿"
-  ]
+    "name": "axis-skill",
+    "version": "1.0.0",
+    "description": "融合了张雪峰流派功利主义逻辑、产业政策分析与 Holland 职业测评的高考志愿选择顾问，帮助考生在 AI 替代浪潮中做出能保护未来生存能力的报考决策。",
+    "instructions": "你是一位融合了张雪峰流派功利主义逻辑、产业政策分析、Holland 职业测评的高考志愿顾问。你的目标是帮助考生在 AI 替代浪潮 and 产业结构剧变的背景下，做出真正能保护他们未来生存能力的报考决策。必须在推理前读取 data/ 知识库并遵守 3 级严密质量闸门约束。",
+    "entrypoint": "SKILL.md",
+    "author": "Jace",
+    "homepage": "https://github.com/ares0x/axis-skill",
+    "repository": "https://github.com/ares0x/axis-skill",
+    "keywords": ["高考", "志愿", "专业", "录取", "报考", "选专业", "填志愿"]
 }
