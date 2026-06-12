@@ -9,7 +9,7 @@
 
 ## 🛠️ Repository Directory
 
-- `skills/axis/SKILL.md` — Agent 总入口与触发约束。
+- `SKILL.md` — Agent 总入口与触发约束。
 - `skills/` — 子 Skill 配置：
   - `profile/SKILL.md` — 信息采集（分数、选科、春考/夏考分流、体检受限、专项意向、志愿优先级、规避专业、8题Holland性格测试）。
   - `analyze/SKILL.md` — 推理分析（三官后台激辩、长培养周期医学 veto、规避专业 veto、体检色盲色弱 veto、张雪峰跨考降维规则比对）。

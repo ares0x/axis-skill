@@ -166,6 +166,8 @@ class TestSanageAxis(unittest.TestCase):
         runner.handle_set("body_restriction 无")
         runner.handle_set("willing_special 否")
         runner.handle_set("priority 学校优先")
+        runner.handle_set("region 无特别偏好")
+        runner.handle_set("financial 一般")
         
         step = runner.get_profile_step(runner.current_facts)
         self.assertEqual(step, 2)
@@ -238,6 +240,8 @@ class TestSanageAxis(unittest.TestCase):
         runner.current_facts["psychological_profile"]["holland_code_inferred"] = ["I", "R"]
         runner.current_facts["psychological_profile"]["core_driver"] = "高风险高回报"
         runner.current_facts["basic_info"]["priority_choice"] = "学校优先"
+        runner.current_facts["basic_info"]["region_preference"] = "无特别偏好"
+        runner.current_facts["basic_info"]["financial_ability"] = "一般"
         runner.save_facts(uid, runner.current_facts)
         
         runner.handle_report()
@@ -392,6 +396,8 @@ class TestSanageAxis(unittest.TestCase):
         runner.execute_command("/set body_restriction 无")
         runner.execute_command("/set willing_special 否")
         runner.execute_command("/set priority 学校优先")
+        runner.execute_command("/set region 无特别偏好")
+        runner.execute_command("/set financial 一般")
         runner.execute_command("/set dislikes 土木,生化环材")
         
         profile = runner.current_facts["psychological_profile"]
@@ -400,6 +406,8 @@ class TestSanageAxis(unittest.TestCase):
         self.assertEqual(runner.current_facts["basic_info"]["body_restriction"], "无")
         self.assertEqual(runner.current_facts["basic_info"]["willing_special"], "否")
         self.assertEqual(runner.current_facts["basic_info"]["priority_choice"], "学校优先")
+        self.assertEqual(runner.current_facts["basic_info"]["region_preference"], "无特别偏好")
+        self.assertEqual(runner.current_facts["basic_info"]["financial_ability"], "一般")
         self.assertEqual(runner.current_facts["basic_info"]["dislikes"], ["土木", "生化环材"])
         
         # 4. Check step completion is Step 3 (all Gates complete)

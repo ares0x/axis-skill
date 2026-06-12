@@ -4,7 +4,7 @@ This file serves as a reference catalog for AI agents (e.g. Claude Code or claud
 
 ## 📁 Repository Map
 
-- `skills/axis/SKILL.md` — The main entrypoint for triggering the高考志愿顾问 service.
+- `SKILL.md` — The main entrypoint for triggering the高考志愿顾问 service.
 - `skills/` — The directory hosting specialized subskills:
   - `profile/SKILL.md` — Information collection protocols & interactive personality diagnostic scripts.
   - `analyze/SKILL.md` — Utilization matching rules & three-officer backend adversarial review.
